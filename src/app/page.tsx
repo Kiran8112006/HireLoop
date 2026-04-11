@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { setDoc, doc } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ChevronLeftIcon, Grid2x2PlusIcon } from "lucide-react";
+import { Particles } from "@/components/ui/particles";
 
 export default function LoginPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     try {
@@ -35,7 +40,7 @@ export default function LoginPage() {
       await setDoc(doc(db, "recruiters", userCred.user.uid), {
         email,
         isApproved: false,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
 
       alert("Signup successful! Wait for admin approval.");
@@ -43,13 +48,81 @@ export default function LoginPage() {
       alert(err.message);
     }
   };
-
   return (
-    <div>
-      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-      <button onClick={handleLogin}>Login</button>
-      <button onClick={handleSignup}>Signup</button>
+    <div className="auth-page">
+      <Particles
+        color="#b8c0cc"
+        quantity={100}
+        ease={16}
+        minSize={0.35}
+        maxSize={1.1}
+        className="auth-particles"
+      />
+
+      <div aria-hidden className="auth-glow-layer">
+        <div className="auth-glow auth-glow-primary" />
+        <div className="auth-glow auth-glow-secondary" />
+      </div>
+
+      <div className="auth-shell">
+        <Button variant="ghost" className="auth-home-btn" asChild>
+          <a href="#">
+            <ChevronLeftIcon className="icon-sm" />
+            Home
+          </a>
+        </Button>
+
+        <div className="auth-card">
+          <div className="auth-brand-row">
+            <Grid2x2PlusIcon className="icon-md" />
+            <p className="auth-brand">HireLoop</p>
+          </div>
+
+          <div className="auth-heading-block">
+            <h1 className="auth-heading">Sign In or Join Now!</h1>
+            <p className="auth-subtitle">Login to your HireLoop account.</p>
+          </div>
+
+          <div className="auth-form-stack">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <div className="password-wrap">
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="password-input"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+            <Button type="button" size="lg" className="full-width" onClick={handleLogin}>
+              Login
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className="full-width"
+              onClick={handleSignup}
+            >
+              Sign Up
+            </Button>
+          </div>
+
+          
+        </div>
+      </div>
     </div>
   );
 }
