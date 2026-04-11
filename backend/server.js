@@ -4,11 +4,14 @@ import crypto from 'crypto';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import atsRouter from './ats.js';
+
 dotenv.config();
 
 const app = express();
 app.use(express.json());
 app.use(cors()); 
+app.use('/', atsRouter);
 
 const razorpay = new Razorpay({
     key_id: process.env.TEST_API_KEY,
@@ -78,5 +81,7 @@ app.post('/verify-payment', async (req, res) => {
         return res.status(400).json({ message: "Invalid signature sent!" });
     }
 });
+
+
 
 app.listen(5000, () => console.log("Server running on port 5000"));

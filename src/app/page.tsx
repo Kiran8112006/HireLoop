@@ -25,24 +25,24 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error(err);
-      alert(err.message); 
+      alert(err.message);
     }
   };
   const handleSignup = async () => {
-  try {
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
 
-    await setDoc(doc(db, "recruiters", userCred.user.uid), {
-      email,
-      isApproved: false,
-      createdAt: new Date()
-    });
+      await setDoc(doc(db, "recruiters", userCred.user.uid), {
+        email,
+        isApproved: false,
+        createdAt: new Date()
+      });
 
-    alert("Signup successful! Wait for admin approval.");
-  } catch (err: any) {
-    alert(err.message);
-  }
-};
+      alert("Signup successful! Wait for admin approval.");
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
 
   return (
     <div>
