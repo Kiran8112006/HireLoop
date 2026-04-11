@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createJob } from "@/lib/jobs";
 import { auth } from "@/lib/firebase";
+import PaymentButton from "../payment/payment";
 
 export default function RecruiterPage() {
   const [title, setTitle] = useState("");
@@ -42,6 +43,7 @@ export default function RecruiterPage() {
       />
 
       <button onClick={handleCreateJob}>Post Job</button>
+      <PaymentButton amount={500} orderType="subscription" userId="user123" />
     </div>
   );
 }
