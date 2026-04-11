@@ -2,8 +2,8 @@ import './globals.css'
 import Providers from '../components/Providers'
 
 export const metadata = {
-  title: 'HireLoop',
-  description: 'Streamline hiring with smart workflows.'
+  title: 'HireLoop | College Hiring Portal',
+  description: 'A professional college hiring portal for students, recruiters, and the placement team.'
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

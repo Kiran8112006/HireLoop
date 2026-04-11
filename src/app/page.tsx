@@ -1,128 +1,102 @@
-"use client";
-import { useState } from "react";
-import { loginUser } from "@/lib/auth";
-import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { setDoc, doc } from "firebase/firestore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChevronLeftIcon, Grid2x2PlusIcon } from "lucide-react";
-import { Particles } from "@/components/ui/particles";
+import { Building2Icon, BriefcaseIcon, SearchIcon, ShieldCheckIcon, SparklesIcon, ArrowRightIcon } from "lucide-react";
 
-export default function LoginPage() {
-  const router = useRouter();
+const highlights = [
+  {
+    icon: SearchIcon,
+    title: "Student profiles",
+    description:
+      "Review skills, projects, transcripts and eligibility in a unified profile. Students can add resumes, links and portfolios so recruiters can quickly evaluate fit.",
+  },
+  {
+    icon: ShieldCheckIcon,
+    title: "Placement workflow",
+    description:
+      "Track applications, interviews, rounds, feedback and approvals in one organized workflow. Schedule interviews, capture outcomes and notify students automatically.",
+  },
+  {
+    icon: BriefcaseIcon,
+    title: "College hiring",
+    description:
+      "Designed for recruiters, students and placement teams to coordinate drives, shortlist candidates, manage offers and archive outcomes with audit trails.",
+  },
+];
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleLogin = async () => {
-    try {
-      const res = await loginUser(email, password);
-
-      if (res.role === "admin") {
-        router.push("/admin");
-      } else if (res.role === "student") {
-        router.push("/student");
-      } else {
-        router.push("/recruiter");
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message);
-    }
-  };
-  const handleSignup = async () => {
-    try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-
-      await setDoc(doc(db, "recruiters", userCred.user.uid), {
-        email,
-        isApproved: false,
-        createdAt: new Date(),
-      });
-
-      alert("Signup successful! Wait for admin approval.");
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
+export default function HomePage() {
   return (
-    <div className="auth-page">
-      <Particles
-        color="#b8c0cc"
-        quantity={100}
-        ease={16}
-        minSize={0.35}
-        maxSize={1.1}
-        className="auth-particles"
-      />
-
-      <div aria-hidden className="auth-glow-layer">
-        <div className="auth-glow auth-glow-primary" />
-        <div className="auth-glow auth-glow-secondary" />
-      </div>
-
-      <div className="auth-shell">
-        <Button variant="ghost" className="auth-home-btn" asChild>
-          <a href="#">
-            <ChevronLeftIcon className="icon-sm" />
-            Home
-          </a>
-        </Button>
-
-        <div className="auth-card">
-          <div className="auth-brand-row">
-            <Grid2x2PlusIcon className="icon-md" />
-            <p className="auth-brand">HireLoop</p>
-          </div>
-
-          <div className="auth-heading-block">
-            <h1 className="auth-heading">Sign In or Join Now!</h1>
-            <p className="auth-subtitle">Login to your HireLoop account.</p>
-          </div>
-
-          <div className="auth-form-stack">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <div className="password-wrap">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="password-input"
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword((prev) => !prev)}
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
+    <main className="landing-page">
+      <section className="landing-hero">
+        <header className="landing-topbar">
+          <div className="landing-brand">
+            <div className="landing-brand-mark">
+              <Building2Icon className="landing-brand-icon" />
             </div>
-            <Button type="button" size="lg" className="full-width" onClick={handleLogin}>
-              Login
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              className="full-width"
-              onClick={handleSignup}
-            >
-              Sign Up
-            </Button>
+            <div>
+              <p className="landing-brand-name">HireLoop</p>
+            </div>
+          </div>
+          <div className="landing-actions">
+            <a href="/auth" className="landing-access-btn ui-btn ui-btn-outline ui-btn-lg">
+              Access the portal
+              <ArrowRightIcon className="landing-access-icon" />
+            </a>
+          </div>
+        </header>
+
+        <div className="landing-grid">
+          <div className="landing-copy">
+            <span className="landing-pill">
+              <SparklesIcon className="landing-pill-icon" />
+              College hiring workspace
+            </span>
+            <h1 className="landing-headline">Connect students, recruiters and the placement team.</h1>
+            <p>HireLoop helps the college manage internship drives, student applications and placement workflows with a polished hiring experience.</p>
+            
+            <div className="landing-panel-stack landing-mini-inline">
+              <div className="landing-mini-card">
+                <span className="landing-mini-label">For students</span>
+                <strong>Profile, apply, track status</strong>
+                <p>Keep one updated profile and follow every application from a single dashboard.</p>
+              </div>
+
+              <div className="landing-mini-card">
+                <span className="landing-mini-label">For recruiters</span>
+                <strong>Shortlist faster</strong>
+                <p>Review student information, filter eligibility, and move candidates through rounds.</p>
+              </div>
+
+              <div className="landing-mini-card">
+                <span className="landing-mini-label">For placement team</span>
+                <strong>Coordinate the drive</strong>
+                <p>Manage approvals, schedules, and outcomes without switching tools.</p>
+              </div>
+            </div>
           </div>
 
-          
+          <aside className="landing-panel">
+            <div className="landing-panel-stack">
+              {highlights.map((feature, idx) => {
+                const Icon = feature.icon;
+                return (
+                  <div key={feature.title} className="landing-feature-group">
+                    <div className="landing-feature-card">
+                      <div className="landing-feature-icon-wrap">
+                        <Icon className="landing-feature-icon" />
+                      </div>
+                      <div className="landing-feature-content">
+                        <h2>{feature.title}</h2>
+                        <p>{feature.description}</p>
+                      </div>
+                    </div>
+                    {idx < highlights.length - 1 && <div className="feature-divider" />}
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
         </div>
-      </div>
-    </div>
+      </section>
+
+      {/* features moved into the right panel */}
+    </main>
   );
 }
