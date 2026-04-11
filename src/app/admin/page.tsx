@@ -35,32 +35,37 @@ export default function AdminPage() {
     // refresh list
     window.location.reload();
   };
-  const handleFileUpload = (e: any) => {
+ const handleFileUpload = async (e: any) => {
+  console.log("UPLOAD TRIGGERED");
   const file = e.target.files[0];
+  console.log("FILE:", file);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const students = results.data;
+  if (!file) {
+    alert("Please select a file");
+    return;
+  }
 
-        try {
-          await fetch("http://localhost:5000/bulk-create-students", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ students }),
-          });
+  const formData = new FormData();
+  formData.append("file", file);
 
-          alert("Students uploaded successfully!");
-        } catch (err) {
-          console.error(err);
-          alert("Upload failed");
-        }
-      },
+  try {
+    const res = await fetch("http://localhost:5000/upload-students", {
+      method: "POST",
+      body: formData,
     });
-  };  
+
+    const data = await res.json();
+
+    alert(
+      data.results
+        .map((r: any) => `${r.email}: ${r.status}`)
+        .join("\n")
+    );
+
+  } catch (err) {
+    alert("Upload failed");
+  }
+};
 
   return (
     <div>
