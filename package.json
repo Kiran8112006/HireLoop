@@ -11,6 +11,7 @@
     "clsx": "^2.1.1",
     "firebase": "^12.11.0",
     "next": "latest",
+    "razorpay": "^2.9.6",
     "react": "latest",
     "react-dom": "latest",
     "tailwind-merge": "^3.5.0"
@@ -19,5 +20,19 @@
     "@types/node": "25.5.2",
     "@types/react": "19.2.14",
     "typescript": "6.0.2"
-  }
+  },
+  "description": "Simple Next.js scaffold with a basic landing page.",
+  "main": "next.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YTFL/HireLoop.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/YTFL/HireLoop/issues"
+  },
+  "homepage": "https://github.com/YTFL/HireLoop#readme"
 }
