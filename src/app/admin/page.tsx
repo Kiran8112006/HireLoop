@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import Papa from "papaparse";
 
 export default function AdminPage() {
   const [recruiters, setRecruiters] = useState<any[]>([]);
@@ -34,6 +35,32 @@ export default function AdminPage() {
     // refresh list
     window.location.reload();
   };
+  const handleFileUpload = (e: any) => {
+  const file = e.target.files[0];
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const students = results.data;
+
+        try {
+          await fetch("http://localhost:5000/bulk-create-students", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ students }),
+          });
+
+          alert("Students uploaded successfully!");
+        } catch (err) {
+          console.error(err);
+          alert("Upload failed");
+        }
+      },
+    });
+  };  
 
   return (
     <div>
@@ -54,7 +81,15 @@ export default function AdminPage() {
 
           <hr />
         </div>
+        
       ))}
+      <h2>Upload Students CSV</h2>
+
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+          />
     </div>
   );
 }

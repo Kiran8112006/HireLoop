@@ -81,7 +81,48 @@ app.post('/verify-payment', async (req, res) => {
         return res.status(400).json({ message: "Invalid signature sent!" });
     }
 });
+app.post("/bulk-create-students", async (req, res) => {
+  try {
+    const { students } = req.body;
 
+    if (!students || students.length === 0) {
+      return res.status(400).json({ error: "No students provided" });
+    }
+
+    const results = [];
+
+    for (let student of students) {
+      try {
+    
+        const userRecord = await admin.auth().createUser({
+          email: student.email,
+          password: student.password,
+        });
+
+       
+        await db.collection("students").doc(userRecord.uid).set({
+          email: student.email,
+          createdAt: new Date(),
+          paymentDone: false,
+        });
+
+        results.push({ email: student.email, status: "success" });
+
+      } catch (err) {
+        results.push({ email: student.email, error: err.message });
+      }
+    }
+
+    res.json({
+      message: "Bulk upload completed",
+      results,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 app.listen(5000, () => console.log("Server running on port 5000"));
