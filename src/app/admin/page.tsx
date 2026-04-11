@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import Papa from "papaparse";
 
 export default function AdminPage() {
   const [recruiters, setRecruiters] = useState<any[]>([]);
@@ -34,6 +35,37 @@ export default function AdminPage() {
     // refresh list
     window.location.reload();
   };
+ const handleFileUpload = async (e: any) => {
+  console.log("UPLOAD TRIGGERED");
+  const file = e.target.files[0];
+  console.log("FILE:", file);
+
+  if (!file) {
+    alert("Please select a file");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await fetch("http://localhost:5000/upload-students", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    alert(
+      data.results
+        .map((r: any) => `${r.email}: ${r.status}`)
+        .join("\n")
+    );
+
+  } catch (err) {
+    alert("Upload failed");
+  }
+};
 
   return (
     <div>
@@ -54,7 +86,15 @@ export default function AdminPage() {
 
           <hr />
         </div>
+        
       ))}
+      <h2>Upload Students CSV</h2>
+
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+          />
     </div>
   );
 }
