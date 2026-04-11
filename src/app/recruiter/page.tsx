@@ -43,7 +43,7 @@ export default function RecruiterPage() {
       />
 
       <button onClick={handleCreateJob}>Post Job</button>
-      <PaymentButton amount={500} orderType="subscription" userId="user123" />
+      <PaymentButton amount={500} orderType="listingfees" userId={auth.currentUser?.uid || ""} />
     </div>
   );
 }

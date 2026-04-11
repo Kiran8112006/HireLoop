@@ -3,22 +3,32 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import admin from 'firebase-admin';
 dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Allow requests from your Next.js frontend
+app.use(cors()); 
 
 const razorpay = new Razorpay({
     key_id: process.env.TEST_API_KEY,
     key_secret: process.env.TEST_KEY_SECRET,
 });
 
-// Step 1: Create an Order
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  }),
+});
+
+const db = admin.firestore();
+
 app.post('/create-order', async (req, res) => {
     try {
         const options = {
-            amount: req.body.amount * 100, // amount in smallest currency unit (paise)
+            amount: req.body.amount * 100,
             currency: "INR",
             receipt: `receipt_${Date.now()}`,
             notes: {
@@ -34,7 +44,8 @@ app.post('/create-order', async (req, res) => {
     }
 });
 
-// Step 2: Verify Signature
+
+
 app.post('/verify-payment', async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
@@ -46,8 +57,22 @@ app.post('/verify-payment', async (req, res) => {
 
     if (razorpay_signature === expectedSign) {
         const orderDetails = await razorpay.orders.fetch(razorpay_order_id);
-        const orderType = orderDetails.notes.user_id;
-        console.log(orderType)
+        const orderType = orderDetails.notes.order_type;
+        const uid = orderDetails.notes.user_id;
+        console.log (uid);
+        const collectionName =
+        orderType === "subscription" ? "students" : "recruiters";
+        
+        await db.collection(collectionName).doc(orderDetails.notes.user_id).set(
+        {
+            paymentDone: true,
+            paymentId: razorpay_payment_id,
+            orderId: razorpay_order_id,
+            updatedAt: new Date(),
+        },
+        { merge: true }
+        );
+        
         return res.status(200).json({ message: "Payment verified successfully" });
     } else {
         return res.status(400).json({ message: "Invalid signature sent!" });

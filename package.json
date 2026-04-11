@@ -8,11 +8,13 @@
     "start": "next start"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
     "firebase": "^12.11.0",
+    "firebase-admin": "^13.8.0",
     "next": "latest",
     "razorpay": "^2.9.6",
     "react": "latest",
