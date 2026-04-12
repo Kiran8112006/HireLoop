@@ -6,17 +6,17 @@ import { auth } from "@/lib/firebase";
 import PaymentButton from "../payment/payment";
 
 export default function RecruiterPage() {
-  
+
   const [companyName, setCompanyName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-   const handlePostJob = async () => {
+  const handlePostJob = async () => {
     if (!companyName || !title || !description || !startDate || !endDate) {
-    alert("Please fill all fields");
-    return;
+      alert("Please fill all fields");
+      return;
     }
 
     const user = auth.currentUser;
@@ -107,7 +107,7 @@ export default function RecruiterPage() {
         orderType="listingfees"
         userId={auth.currentUser?.uid || ""}
       />
-
+      <p>{auth.currentUser?.uid || "not found"}</p>
       <button
         disabled={
           !companyName || !title || !description || !startDate || !endDate
