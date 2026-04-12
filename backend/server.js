@@ -13,13 +13,13 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); 
+app.use(cors());
 app.use('/', atsRouter);
 const upload = multer({ dest: "uploads/" });
 
 const razorpay = new Razorpay({
-    key_id: process.env.TEST_API_KEY,
-    key_secret: process.env.TEST_KEY_SECRET,
+  key_id: process.env.TEST_API_KEY,
+  key_secret: process.env.TEST_KEY_SECRET,
 });
 
 admin.initializeApp({
@@ -33,34 +33,34 @@ admin.initializeApp({
 const db = admin.firestore();
 
 app.post('/create-order', async (req, res) => {
-    try {
-        const options = {
-            amount: req.body.amount * 100,
-            currency: "INR",
-            receipt: `receipt_${Date.now()}`,
-            notes: {
-                order_type: req.body.order_type,
-                user_id: req.body.user_id,
-            }
-        };
+  try {
+    const options = {
+      amount: req.body.amount * 100,
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+      notes: {
+        order_type: req.body.order_type,
+        user_id: req.body.user_id,
+      }
+    };
 
-        const order = await razorpay.orders.create(options);
-        res.status(200).json(order);
-    } catch (err) {
-        res.status(500).send(err);
-    }
+    const order = await razorpay.orders.create(options);
+    res.status(200).json(order);
+  } catch (err) {
+    res.status(500).send(err);
+  }
 });
 
 
 
 app.post('/verify-payment', async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    const sign = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSign = crypto
-        .createHmac("sha256", process.env.TEST_KEY_SECRET)
-        .update(sign.toString())
-        .digest("hex");
+  const sign = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSign = crypto
+    .createHmac("sha256", process.env.TEST_KEY_SECRET)
+    .update(sign.toString())
+    .digest("hex");
 
     if (razorpay_signature === expectedSign) {
         const orderDetails = await razorpay.orders.fetch(razorpay_order_id);
@@ -87,7 +87,7 @@ app.post('/verify-payment', async (req, res) => {
 });
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   try {
-    
+
 
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -99,15 +99,15 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
     fs.createReadStream(filePath)
       .pipe(csv())
       .on("data", (row) => {
-        
+
         students.push(row);
       })
       .on("end", async () => {
-        
+
         const results = [];
 
         for (let student of students) {
-          
+
 
           let uid;
 
@@ -120,7 +120,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             uid = userRecord.uid;
 
           } catch (err) {
-            
+
 
             if (err.code === "auth/email-already-exists") {
               const existingUser = await admin.auth().getUserByEmail(student.email);
@@ -135,7 +135,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             }
           }
 
-          
+
 
           const skillsArray = student.skills
             ? student.skills.split("|")
@@ -173,4 +173,8 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
 });
 
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+const PORT = process.env.PORT || 5000; // Use Render's port or default to 5000 locally
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
+});
