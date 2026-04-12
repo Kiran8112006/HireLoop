@@ -62,28 +62,28 @@ app.post('/verify-payment', async (req, res) => {
     .update(sign.toString())
     .digest("hex");
 
-  if (razorpay_signature === expectedSign) {
-    const orderDetails = await razorpay.orders.fetch(razorpay_order_id);
-    const orderType = orderDetails.notes.order_type;
-    const uid = orderDetails.notes.user_id;
-    console.log(uid);
-    const collectionName =
-      orderType === "subscription" ? "students" : "recruiters";
-
-    await db.collection(collectionName).doc(orderDetails.notes.user_id).set(
-      {
-        paymentDone: true,
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-
-    return res.status(200).json({ message: "Payment verified successfully" });
-  } else {
-    return res.status(400).json({ message: "Invalid signature sent!" });
-  }
+    if (razorpay_signature === expectedSign) {
+        const orderDetails = await razorpay.orders.fetch(razorpay_order_id);
+        const orderType = orderDetails.notes.order_type;
+        const uid = orderDetails.notes.user_id;
+        console.log (uid);
+        const collectionName =
+        orderType === "subscription" ? "students" : "recruiters";
+        
+        await db.collection(collectionName).doc(orderDetails.notes.user_id).set(
+        {
+            paymentDone: true,
+            paymentId: razorpay_payment_id,
+            orderId: razorpay_order_id,
+            updatedAt: new Date(),
+        },
+        { merge: true }
+        );
+        
+        return res.status(200).json({ message: "Payment verified successfully" });
+    } else {
+        return res.status(400).json({ message: "Invalid signature sent!" });
+    }
 });
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   try {
