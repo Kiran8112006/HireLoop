@@ -9,21 +9,34 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import PaymentButton from "../payment/payment";
-import { Search, MapPin, Briefcase, SlidersHorizontal, Settings, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function StudentPage() {
   const [user, setUser] = useState<any>(null);
   const [student, setStudent] = useState<any>(null);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [applicationsByJob, setApplicationsByJob] = useState<Record<string, any>>({});
+  const [isApplyingJobId, setIsApplyingJobId] = useState<string | null>(null);
+  const router = useRouter();
   
   // Modals state
   const [isAtsModalOpen, setIsAtsModalOpen] = useState(false);
   const [isUploadResumeModalOpen, setIsUploadResumeModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isAppModalOpen, setIsAppModalOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+
+  // Search & Sort state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("newest"); // newest, oldest, name
+  const [sortOpen, setSortOpen] = useState(false);
 
   // ATS State
   const [atsJobTitle, setAtsJobTitle] = useState("");
@@ -34,14 +47,7 @@ export default function StudentPage() {
   const [atsSummary, setAtsSummary] = useState("");
   const [atsError, setAtsError] = useState("");
 
-  // Dark modal subtle glow attributes
-  const cardThemes = [
-    { bg: "linear-gradient(180deg, rgba(56, 189, 248, 0.15), transparent)", border: "rgba(56, 189, 248, 0.4)" }, // cyan
-    { bg: "linear-gradient(180deg, rgba(16, 185, 129, 0.15), transparent)", border: "rgba(16, 185, 129, 0.4)" }, // emerald
-    { bg: "linear-gradient(180deg, rgba(139, 92, 246, 0.15), transparent)", border: "rgba(139, 92, 246, 0.4)" }, // violet
-    { bg: "linear-gradient(180deg, rgba(245, 158, 11, 0.15), transparent)", border: "rgba(245, 158, 11, 0.4)" }, // amber
-    { bg: "linear-gradient(180deg, rgba(248, 113, 113, 0.15), transparent)", border: "rgba(248, 113, 113, 0.4)" }, // red
-  ];
+  const theme = { bg: "linear-gradient(180deg, rgba(56, 189, 248, 0.08), transparent)", border: "var(--ad-border)" };
 
   // 🔥 FETCH STUDENT
   useEffect(() => {
@@ -57,18 +63,33 @@ export default function StudentPage() {
     fetchStudent();
   }, [user]);
 
-  // 🔥 FETCH JOBS
+  // 🔥 FETCH JOBS & APPLICATIONS
   useEffect(() => {
     const fetchJobs = async () => {
       const snapshot = await getDocs(collection(db, "jobs"));
       const jobsList = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        createdAtDate: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
       }));
       setJobs(jobsList);
     };
+
+    const fetchApplications = async () => {
+      const u = auth.currentUser;
+      if (!u) return;
+      const q = query(collection(db, "applications"), where("studentId", "==", u.uid));
+      const snap = await getDocs(q);
+      const apps: Record<string, any> = {};
+      snap.docs.forEach(d => {
+        apps[d.data().jobId] = { id: d.id, ...d.data() };
+      });
+      setApplicationsByJob(apps);
+    };
+
     fetchJobs();
-  }, []);
+    fetchApplications();
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -79,20 +100,28 @@ export default function StudentPage() {
     return () => unsubscribe();
   }, []);
 
-  // 🔥 APPLY FUNCTION
-  const handleApply = async (jobId: string) => {
-    if (!user) return;
-    try {
-      await addDoc(collection(db, "applications"), {
-        jobId,
-        studentId: user.uid,
-        createdAt: new Date(),
-      });
-      alert("Applied Successfully!");
-    } catch (e) {
-      alert("Error applying to job.");
-    }
+  // Filter and Sort Jobs
+  const filteredAndSortedJobs = jobs
+    .filter((job) => {
+      const titleMatch = (job.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const companyMatch = (job.companyName || "").toLowerCase().includes(searchTerm.toLowerCase());
+      return titleMatch || companyMatch;
+    })
+    .sort((a, b) => {
+      if (sortBy === "newest") return b.createdAtDate - a.createdAtDate;
+      if (sortBy === "oldest") return a.createdAtDate - b.createdAtDate;
+      if (sortBy === "name") return (a.title || "").localeCompare(b.title || "");
+      return 0;
+    });
+
+  const getApplicationStatusLabel = (status: string | undefined) => {
+    const normalized = (status || "applied").toLowerCase();
+    if (normalized === "interview_scheduled") return "Interview Scheduled";
+    if (normalized === "shortlisted") return "Shortlisted";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   };
+
+  const appliedJobs = jobs.filter((job) => !!applicationsByJob[job.id]);
 
   // 🔥 RESUME UPLOAD
   const handleResumeUpload = async (e: any) => {
@@ -165,8 +194,19 @@ export default function StudentPage() {
     }
   };
 
-  const getRandomTheme = (index: number) => {
-    return cardThemes[index % cardThemes.length];
+  // 🔥 APPLY FUNCTION
+  const handleApply = (jobId: string) => {
+    if (!user) {
+      alert("Please login to apply");
+      return;
+    }
+    router.push(`/student/apply/${jobId}`);
+  };
+
+  const sortLabels: Record<string, string> = {
+    newest: "Last updated",
+    oldest: "Oldest first",
+    name: "A-Z Name"
   };
 
   return (
@@ -182,21 +222,27 @@ export default function StudentPage() {
 
           <div className="sd-header-search">
             <Search size={18} style={{color: 'var(--ad-muted)'}} />
-            <input type="text" placeholder="Search Jobs..." className="sd-header-search-input" />
+            <input 
+              type="text" 
+              placeholder="Search Jobs..." 
+              className="sd-header-search-input" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
 
           <div className="sd-nav-right">
-
-            <div className="sd-user-actions">
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,rgba(56,189,248,0.22),rgba(16,185,129,0.26))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', border: '1px solid rgba(148,163,184,0.15)' }}>
-                 {student?.name?.charAt(0) || "U"}
-              </div>
-              <button className="sd-icon-btn"><Settings size={18}/></button>
-              <button className="sd-icon-btn"><Bell size={18}/></button>
-            </div>
+            <Link href="/student/profile" className="sd-nav-link">Profile</Link>
+            <button 
+              className="sd-icon-btn" 
+              onClick={() => auth.signOut().then(() => router.push("/auth"))}
+              title="Logout"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
           </div>
-        </header>
 
+        </header>
       </div>
 
       {/* MAIN CONTENT SPLIT */}
@@ -204,18 +250,44 @@ export default function StudentPage() {
         {/* LEFT SIDEBAR (Filters/Promo) */}
         <div className="sd-sidebar">
           
-          <div className="sd-promo-card">
-            <h2 className="sd-promo-title">Land Your Dream Job with HireLoop</h2>
-            <button className="sd-promo-btn" onClick={() => setIsAtsModalOpen(true)}>ATS Analyzer</button>
-            <div style={{marginTop: '1rem'}}>
-              <button className="sd-promo-btn-secondary" onClick={() => setIsUploadResumeModalOpen(true)}>Upload Resume</button>
+          <div className="sd-promo-card-premium">
+            <h2 className="sd-promo-title-premium">Land Your Dream Job with HireLoop</h2>
+            <button className="sd-promo-btn-premium-solid" onClick={() => setIsAtsModalOpen(true)}>ATS Analyzer</button>
+            <div style={{marginTop: '0.75rem'}}>
+              <button className="sd-promo-btn-premium-outline" onClick={() => setIsUploadResumeModalOpen(true)}>Upload Resume</button>
             </div>
-             <div style={{marginTop: '1rem'}}>
-              <button className="sd-promo-btn-premium" onClick={() => setIsPaymentModalOpen(true)}>Premium Features</button>
+            <div style={{marginTop: '0.75rem'}}>
+              <button className="sd-promo-btn-premium-outline" onClick={() => router.push("/student/profile")}>Edit Profile</button>
+            </div>
+             <div style={{marginTop: '0.75rem'}}>
+              <button className="sd-promo-btn-premium-gold" onClick={() => setIsPaymentModalOpen(true)}>Premium Features</button>
             </div>
           </div>
 
-
+          <div className="sd-applications-card">
+            <h3 className="sd-applications-title">My Applications</h3>
+            {appliedJobs.length === 0 ? (
+              <p className="sd-applications-empty">No applications yet.</p>
+            ) : (
+              <div className="sd-application-list">
+                {appliedJobs.map(job => (
+                  <div 
+                    key={job.id} 
+                    className="sd-application-item" 
+                    onClick={() => {
+                      setSelectedApplication({ job, application: applicationsByJob[job.id] });
+                      setIsAppModalOpen(true);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="sd-application-item-title">{job.title}</div>
+                    <div className="sd-application-item-company">{job.companyName}</div>
+                    <div className="sd-application-status-chip">{getApplicationStatusLabel(applicationsByJob[job.id]?.status)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* RIGHT CONTENT (Feed) */}
@@ -223,22 +295,52 @@ export default function StudentPage() {
           <div className="sd-feed-header">
             <div className="sd-feed-title">
               Recommended jobs
-              <span className="sd-feed-count">{jobs.length > 0 ? jobs.length : 386}</span>
+              <span className="sd-feed-count">{filteredAndSortedJobs.length}</span>
             </div>
-            <div className="sd-sort-by">
-              Sort by: <span>Last updated</span> <SlidersHorizontal size={18} style={{marginLeft: '0.5rem', color: '#e5eef8'}}/>
+            <div className="sd-sort-wrapper">
+              <span style={{color: 'var(--ad-muted)', fontSize: '0.9rem'}}>Sort by:</span>
+              <div className="sd-custom-dropdown">
+                <div 
+                  className={`sd-dropdown-toggle ${sortOpen ? 'active' : ''}`} 
+                  onClick={() => setSortOpen(!sortOpen)}
+                >
+                  {sortLabels[sortBy]}
+                   <span className="sd-dropdown-chevron">▼</span>
+                </div>
+                {sortOpen && (
+                  <div className="sd-dropdown-menu">
+                    {Object.entries(sortLabels).map(([key, label]) => (
+                      <div 
+                        key={key} 
+                        className={`sd-dropdown-item ${sortBy === key ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSortBy(key);
+                          setSortOpen(false);
+                        }}
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="sd-job-grid">
-            {jobs.map((job, index) => {
-              const theme = getRandomTheme(index);
+            {filteredAndSortedJobs.map((job) => {
+              const application = applicationsByJob[job.id];
+              const alreadyApplied = !!application;
               return (
-                <div key={job.id} className="sd-job-card" style={{borderTopColor: theme.border}}>
-                   <div className="sd-job-card-top" style={{ background: theme.bg }}>
+                <div key={job.id} className="sd-job-card">
+                   <div 
+                     className="sd-job-card-top" 
+                     style={{ background: theme.bg, cursor: 'pointer' }}
+                     onClick={() => router.push(`/student/jobs/${job.id}`)}
+                   >
                       <div className="sd-job-date-row">
-                         <span className="sd-job-date">{new Date().toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
-                         <button className="sd-job-bookmark">
+                         <span className="sd-job-date">{new Date(job.createdAtDate).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
+                         <button className="sd-job-bookmark" onClick={(e) => e.stopPropagation()}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
                          </button>
                       </div>
@@ -253,9 +355,8 @@ export default function StudentPage() {
                       </div>
 
                       <div className="sd-job-tags">
-                        <span className="sd-job-tag" style={{borderColor: theme.border, color: theme.border}}>Full time</span>
-                        <span className="sd-job-tag" style={{borderColor: theme.border, color: theme.border}}>Senior level</span>
-                        <span className="sd-job-tag" style={{borderColor: theme.border, color: theme.border}}>Remote</span>
+                        <span className="sd-job-tag">Full time</span>
+                        <span className="sd-job-tag">Remote</span>
                       </div>
                    </div>
                    
@@ -263,46 +364,27 @@ export default function StudentPage() {
                       <div className="sd-job-bottom-left">
                          <div className="sd-job-location" style={{marginTop: 'auto'}}>{job.location || "Bengaluru, India"}</div>
                       </div>
-                      <button className="sd-job-details-btn" onClick={() => handleApply(job.id)}>Apply</button>
+                      {alreadyApplied ? (
+                        <span className="sd-applied-text">Applied</span>
+                      ) : (
+                        <button 
+                          className="sd-job-details-btn" 
+                          onClick={() => handleApply(job.id)}
+                          disabled={isApplyingJobId === job.id}
+                        >
+                          {isApplyingJobId === job.id ? "..." : "Apply"}
+                        </button>
+                      )}
                    </div>
                 </div>
               );
             })}
              
-             {/* If no jobs (or while loading), mock a few to match design state */}
-             {jobs.length === 0 && Array.from({length: 6}).map((_, i) => {
-               const theme = getRandomTheme(i);
-               const mockCompanies = ["Flipkart", "TCS", "Infosys", "Wipro", "Zomato", "Swiggy"];
-               const mockTitles = ["Senior Frontend Developer", "System Engineer", "Java Architect", "Backend Developer", "UI/UX Designer", "Product Manager"];
-               const mockLocations = ["Bengaluru, India", "Mumbai, India", "Pune, India", "Hyderabad, India", "Gurugram, India", "Bengaluru, India"];
-               return (
-                <div key={i} className="sd-job-card" style={{borderTop: `2px solid ${theme.border}`}}>
-                   <div className="sd-job-card-top" style={{ background: theme.bg }}>
-                      <div className="sd-job-date-row">
-                         <span className="sd-job-date">20 Oct, 2023</span>
-                         <button className="sd-job-bookmark">
-                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
-                         </button>
-                      </div>
-                      <div className="sd-job-company">{mockCompanies[i]}</div>
-                      <div className="sd-job-title-row">
-                         <div className="sd-job-title" style={{maxWidth: '70%'}}>{mockTitles[i]}</div>
-                         <div className="sd-job-logo">{mockCompanies[i].charAt(0)}</div>
-                      </div>
-                      <div className="sd-job-tags">
-                        <span className="sd-job-tag">Full time</span>
-                        <span className="sd-job-tag">Remote</span>
-                      </div>
-                   </div>
-                   <div className="sd-job-bottom">
-                      <div className="sd-job-bottom-left">
-                         <div className="sd-job-location">{mockLocations[i]}</div>
-                      </div>
-                      <button className="sd-job-details-btn">Details</button>
-                   </div>
-                </div>
-               )
-             })}
+             {filteredAndSortedJobs.length === 0 && (
+               <div style={{gridColumn: '1/-1', textAlign: 'center', padding: '4rem', color: 'var(--ad-muted)'}}>
+                 No jobs found matching "{searchTerm}"
+               </div>
+             )}
           </div>
         </div>
       </div>
@@ -368,6 +450,47 @@ export default function StudentPage() {
             <div style={{padding: '2rem', background: 'var(--ad-surface)', border: '1px solid var(--ad-border)', borderRadius: '16px', textAlign: 'center'}}>
                <h3 style={{fontSize: '2rem', margin: '0 0 1rem 0'}}>₹1000<span style={{fontSize: '1rem', color: 'var(--ad-muted)', fontWeight: 'normal'}}>/month</span></h3>
                <PaymentButton amount={1000} orderType="subscription" userId={auth.currentUser?.uid || ""} />
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Application Details Modal */}
+      {isAppModalOpen && selectedApplication && (
+        <div className="sd-modal-overlay">
+          <div className="sd-modal" style={{maxWidth: '700px'}}>
+            <button className="sd-modal-close" onClick={() => setIsAppModalOpen(false)}>×</button>
+            <div className="sd-job-logo" style={{width: '60px', height: '60px', fontSize: '1.5rem', marginBottom: '1rem'}}>
+              {selectedApplication.job.companyName ? selectedApplication.job.companyName.charAt(0).toUpperCase() : "C"}
+            </div>
+            <h2 style={{margin: '0.5rem 0 0.25rem 0'}}>{selectedApplication.job.title}</h2>
+            <p style={{color: 'var(--ad-cyan)', fontWeight: '600', marginBottom: '1rem'}}>{selectedApplication.job.companyName}</p>
+            
+            <div style={{display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}}>
+               <span className="sd-job-tag">{selectedApplication.job.location || "Remote"}</span>
+               <span className="sd-job-tag">Full time</span>
+               <div className="sd-application-status-chip" style={{fontSize: '0.85rem', padding: '0.4rem 0.8rem'}}>
+                 Status: {getApplicationStatusLabel(selectedApplication.application?.status)}
+               </div>
+            </div>
+
+            <hr />
+            
+            <div className="sd-form-group">
+              <label>Job Description</label>
+              <div style={{color: 'var(--ad-muted)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap'}}>
+                {selectedApplication.job.description || "No description provided."}
+              </div>
+            </div>
+
+            <div className="sd-form-group" style={{marginTop: '2rem'}}>
+              <label>Requirements</label>
+              <div style={{color: 'var(--ad-muted)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap'}}>
+                {selectedApplication.job.requirements || "No specific requirements listed."}
+              </div>
+            </div>
+
+            <div style={{marginTop: '2rem', display: 'flex', justifyContent: 'flex-end'}}>
+               <button className="btn-secondary" onClick={() => setIsAppModalOpen(false)}>Close</button>
             </div>
           </div>
         </div>
