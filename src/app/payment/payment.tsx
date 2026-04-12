@@ -10,7 +10,7 @@ interface PaymentButtonProps {
 }
 
 export default function PaymentButton({ amount, orderType, userId, className = "btn-primary", style }: PaymentButtonProps) {
-    const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000").replace(/\/$/, "");
+    const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "https://hireloop-vy61.onrender.com").replace(/\/$/, "");
     const apiUrl = (path: string) => `${backendUrl}${path}`;
 
     const handlePayment = async () => {
@@ -66,7 +66,7 @@ export default function PaymentButton({ amount, orderType, userId, className = "
             rzp.open();
         } catch (error) {
             console.error("Payment error:", error);
-            alert(error instanceof Error ? error.message : "Unable to start payment. Check the backend server.");
+            alert(error instanceof Error ? error.message : "Unable to start payment. Check backend availability.");
         }
     };
 

@@ -177,7 +177,7 @@ export default function StudentPage() {
       formData.append("jobDescription", atsJobDescription);
       formData.append("resume", atsResumeFile);
 
-      const response = await fetch("http://localhost:5000/analyze-resume", {
+      const response = await fetch("https://hireloop-vy61.onrender.com/analyze-resume", {
         method: "POST",
         body: formData,
       });
@@ -188,7 +188,7 @@ export default function StudentPage() {
       setAtsSummary(typeof data?.summary === "string" ? data.summary : "");
     } catch (err) {
       console.error(err);
-      setAtsError("Unable to get ATS score. Ensure backend is running via port 5000.");
+      setAtsError("Unable to get ATS score. Please ensure the backend service is available.");
     } finally {
       setAtsLoading(false);
     }

@@ -168,7 +168,7 @@ export default function RecruiterPage() {
         fetchedCompanyName = recruiterData.company ?? recruiterData.companyName ?? "Unknown Company";
       }
 
-      const res = await fetch("http://localhost:5000/post-job", {
+      const res = await fetch("https://hireloop-vy61.onrender.com/post-job", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -102,8 +102,9 @@ export default function AdminPage() {
     const formData = new FormData();
     formData.append("file", file);
     try {
+      const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "https://hireloop-vy61.onrender.com").replace(/\/$/, "");
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/upload-students`,
+        `${backendUrl}/upload-students`,
         { method: "POST", body: formData }
       );
       await res.json();
