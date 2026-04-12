@@ -12,11 +12,19 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
+import PaymentButton from "../payment/payment";
 
 export default function StudentPage() {
   const [user, setUser] = useState<any>(null);
   const [student, setStudent] = useState<any>(null);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [atsJobTitle, setAtsJobTitle] = useState("");
+  const [atsJobDescription, setAtsJobDescription] = useState("");
+  const [atsResumeFile, setAtsResumeFile] = useState<File | null>(null);
+  const [atsLoading, setAtsLoading] = useState(false);
+  const [atsScore, setAtsScore] = useState<number | null>(null);
+  const [atsSummary, setAtsSummary] = useState("");
+  const [atsError, setAtsError] = useState("");
 
   // 🔥 FETCH STUDENT
   useEffect(() => {
@@ -121,6 +129,51 @@ export default function StudentPage() {
   }
 };
 
+  const handleAtsAnalyze = async () => {
+    if (!atsJobTitle.trim()) {
+      setAtsError("Please enter a job title.");
+      return;
+    }
+    if (!atsJobDescription.trim()) {
+      setAtsError("Please enter a job description.");
+      return;
+    }
+    if (!atsResumeFile) {
+      setAtsError("Please choose a PDF resume file.");
+      return;
+    }
+
+    setAtsLoading(true);
+    setAtsError("");
+    setAtsScore(null);
+    setAtsSummary("");
+
+    try {
+      const formData = new FormData();
+      formData.append("jobTitle", atsJobTitle);
+      formData.append("jobDescription", atsJobDescription);
+      formData.append("resume", atsResumeFile);
+
+      const response = await fetch("http://localhost:5000/analyze-resume", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("ATS analyze request failed");
+      }
+
+      const data = await response.json();
+      setAtsScore(typeof data?.job_fit_score === "number" ? data.job_fit_score : null);
+      setAtsSummary(typeof data?.summary === "string" ? data.summary : "");
+    } catch (err) {
+      console.error(err);
+      setAtsError("Unable to get ATS score. Check backend server on port 5000.");
+    } finally {
+      setAtsLoading(false);
+    }
+  };
+
   return (
     <div>
       <h1>Student Dashboard</h1>
@@ -163,6 +216,50 @@ export default function StudentPage() {
       disabled={!user}
       onChange={handleResumeUpload}
       />
+
+      <hr />
+
+      <h2>ATS Score</h2>
+      <input
+        type="text"
+        value={atsJobTitle}
+        onChange={(e) => setAtsJobTitle(e.target.value)}
+        placeholder="Job title"
+      />
+      <br />
+      <br />
+      <textarea
+        value={atsJobDescription}
+        onChange={(e) => setAtsJobDescription(e.target.value)}
+        placeholder="Paste job description"
+        rows={5}
+        cols={60}
+      />
+      <br />
+      <br />
+      <input
+        type="file"
+        accept="application/pdf"
+        onChange={(e) => setAtsResumeFile(e.target.files?.[0] ?? null)}
+      />
+      <br />
+      <br />
+      <button onClick={handleAtsAnalyze} disabled={atsLoading}>
+        {atsLoading ? "Calculating..." : "Get ATS Score"}
+      </button>
+      <br />
+      <br />
+      {atsScore !== null && <p><b>ATS Score:</b> {atsScore}%</p>}
+      {atsSummary && <p><b>Summary:</b> {atsSummary}</p>}
+      {atsError && <p style={{ color: "red" }}>{atsError}</p>}
+
+      <br/>
+      <h2> For premium users: Pay here</h2>
+      <PaymentButton amount={1000} orderType="subscription" userId={auth.currentUser?.uid || ""} />
+      
     </div>
+    
+
   );
+  
 }

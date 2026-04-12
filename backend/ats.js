@@ -114,4 +114,40 @@ CRITICAL: Return ONLY the JSON object. No additional text before or after.`;
   }
 });
 
+
 export default router;
+// ===== ATS FEATURE (NEW) =====
+
+function extractKeywords(jd) {
+  const stopwords = ["the","and","is","in","to","for","with","a","an"];
+
+  return [...new Set(
+    jd
+      .toLowerCase()
+      .replace(/\.js/g, "")
+      .split(/\W+/)
+      .filter(word => word.length > 2 && !stopwords.includes(word))
+  )];
+}
+
+function calculateATSScore(jdKeywords, resumeText) {
+  const resume = resumeText.toLowerCase();
+
+  let matched = [];
+  let missing = [];
+
+  jdKeywords.forEach(keyword => {
+    if (resume.includes(keyword)) {
+      matched.push(keyword);
+    } else {
+      missing.push(keyword);
+    }
+  });
+
+  const score = Math.round((matched.length / jdKeywords.length) * 100);
+
+  return { score, matched, missing };
+}
+
+// Export using ES6 syntax
+export { extractKeywords, calculateATSScore };
