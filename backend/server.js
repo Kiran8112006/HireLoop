@@ -70,12 +70,12 @@ app.post('/verify-payment', async (req, res) => {
         const collectionName =
         orderType === "subscription" ? "students" : "recruiters";
         
-        await db.collection(collectionName).doc(orderDetails.notes.user_id).set(
+        await db.collection("recruiters").doc(uid).set(
         {
-            paymentDone: true,
-            paymentId: razorpay_payment_id,
-            orderId: razorpay_order_id,
-            updatedAt: new Date(),
+          credits: admin.firestore.FieldValue.increment(1),
+          paymentId: razorpay_payment_id,
+          orderId: razorpay_order_id,
+          updatedAt: new Date(),
         },
         { merge: true }
         );
