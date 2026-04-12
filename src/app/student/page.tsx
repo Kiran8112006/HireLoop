@@ -96,6 +96,7 @@ export default function StudentPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", "unsigned_upload");
+    formData.append("resource_type", "auto");
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`,
