@@ -1,6 +1,23 @@
-# HireLoop 🎯
+#26ENHL3: Problem Statement 3
+
+HireLoop - End-to-End Campus Recruitment Portal
 
 **A modern college hiring and placement portal** connecting students, recruiters, and placement teams in one unified workspace.
+
+---
+
+## Judge Demo Credentials
+
+- **admin:** `admin@gmail.com`  
+   **password:** `admin@123`
+
+- **recruiter:** `test1@gmail.com`  
+   **password:** `test@123`
+
+- **student:** `john@gmail.com`  
+   **password:** `123456`
+
+- **card number:** `6527 6589 0000 1005`
 
 ---
 
