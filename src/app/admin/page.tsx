@@ -49,7 +49,7 @@ export default function AdminPage() {
   formData.append("file", file);
 
   try {
-    const res = await fetch("http://localhost:5000/upload-students", {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/upload-students`, {
       method: "POST",
       body: formData,
     });

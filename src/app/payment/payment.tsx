@@ -10,7 +10,7 @@ interface PaymentButtonProps {
 export default function PaymentButton({ amount, orderType, userId }: PaymentButtonProps) {
     const handlePayment = async () => {
         // 1. Create order on Express Backend
-        const response = await fetch("http://localhost:5000/create-order", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/create-order`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(
@@ -32,7 +32,7 @@ export default function PaymentButton({ amount, orderType, userId }: PaymentButt
             order_id: order.id,
             handler: async function (response: any) {
                 // 2. Verify payment on Express Backend
-                const verifyRes = await fetch("http://localhost:5000/verify-payment", {
+                const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/verify-payment`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ ...response, order_type: orderType, user_id: userId }),
