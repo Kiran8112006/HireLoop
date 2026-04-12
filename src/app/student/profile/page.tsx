@@ -10,7 +10,7 @@ import {
   MailIcon, 
   PhoneIcon, 
   MapPinIcon, 
-  LinkedinIcon, 
+  LinkIcon as LinkedinIcon, 
   GlobeIcon, 
   GraduationCapIcon, 
   CodeIcon, 

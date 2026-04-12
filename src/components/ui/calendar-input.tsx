@@ -65,7 +65,7 @@ export function CalendarInput({ value, onChange, placeholder = "Select date", cl
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  const days = [];
+  const days: React.ReactNode[] = [];
   for (let i = 0; i < firstDay; i++) {
     days.push(<div key={`empty-${i}`} className="w-8 h-8" />);
   }
