@@ -1,10 +1,8 @@
 "use client";
-
 import { useState, useEffect } from "react"; // Added useEffect
 import { onAuthStateChanged } from "firebase/auth"; // Added this import
 import { auth } from "@/lib/firebase";
 import PaymentButton from "../payment/payment";
-import { useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 
@@ -19,27 +17,27 @@ export default function RecruiterPage() {
   const [applicants, setApplicants] = useState<any[]>([]);
 
   useEffect(() => {
-  const fetchJobs = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    const fetchJobs = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
 
-    const q = query(
-      collection(db, "jobs"),
-      where("recruiterId", "==", user.uid)
-    );
+      const q = query(
+        collection(db, "jobs"),
+        where("recruiterId", "==", user.uid)
+      );
 
-    const snapshot = await getDocs(q);
+      const snapshot = await getDocs(q);
 
-    const jobList = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const jobList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-    setJobs(jobList);
-  };
+      setJobs(jobList);
+    };
 
-  fetchJobs();
-}, []);
+    fetchJobs();
+  }, []);
 
   // ✅ New state to track the verified User ID
   const [userId, setUserId] = useState<string | null>(null);
@@ -94,34 +92,34 @@ export default function RecruiterPage() {
       alert("Error posting job");
     }
   };
-const fetchApplicants = async (jobId: string) => {
-  const q = query(
-    collection(db, "applications"),
-    where("jobId", "==", jobId)
-  );
+  const fetchApplicants = async (jobId: string) => {
+    const q = query(
+      collection(db, "applications"),
+      where("jobId", "==", jobId)
+    );
 
-  const snapshot = await getDocs(q);
+    const snapshot = await getDocs(q);
 
-  const applicantsData: any[] = []; // ✅ IMPORTANT
+    const applicantsData: any[] = []; // ✅ IMPORTANT
 
-  for (let docSnap of snapshot.docs) {
-    const appData = docSnap.data();
+    for (let docSnap of snapshot.docs) {
+      const appData = docSnap.data();
 
-    const studentRef = doc(db, "students", appData.studentId);
-    const studentSnap = await getDoc(studentRef);
+      const studentRef = doc(db, "students", appData.studentId);
+      const studentSnap = await getDoc(studentRef);
 
-    if (studentSnap.exists()) {
-      const studentData = studentSnap.data();
+      if (studentSnap.exists()) {
+        const studentData = studentSnap.data();
 
-      applicantsData.push({
-        id: docSnap.id,
-        ...(studentData || {}),
-      });
+        applicantsData.push({
+          id: docSnap.id,
+          ...(studentData || {}),
+        });
+      }
     }
-  }
 
-  setApplicants(applicantsData);
-};
+    setApplicants(applicantsData);
+  };
 
   return (
     <div>
