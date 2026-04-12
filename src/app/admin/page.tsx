@@ -18,20 +18,15 @@ import {
   LayoutDashboardIcon,
   LogOutIcon,
   ChevronRightIcon,
-  SearchIcon,
-  BellIcon,
-  AlertCircleIcon,
-  TrendingUpIcon,
-  FileTextIcon,
-  HelpCircleIcon,
-  UserCheckIcon,
-  UserXIcon,
-  GraduationCapIcon,
-  BookOpenIcon,
+  XIcon,
   MapPinIcon,
   CalendarIcon,
-  DollarSignIcon,
-  ExternalLinkIcon,
+  SearchIcon,
+  BellIcon,
+  TrendingUpIcon,
+  UserCheckIcon,
+  UserXIcon,
+  BarChart3Icon,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -61,8 +56,9 @@ export default function AdminPage() {
     "idle" | "uploading" | "success" | "error"
   >("idle");
   const [activeView, setActiveView] = useState<
-    "overview" | "recruiters" | "upload" | "students" | "jobs" | "documents" | "resources"
+    "overview" | "recruiters" | "upload" | "students" | "jobs" | "documents"
   >("overview");
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   /* ---- Fetch data ----------------------------------------------- */
   useEffect(() => {
@@ -122,6 +118,57 @@ export default function AdminPage() {
     }
   };
 
+  const toExportString = (value: any) => {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => toExportString(item)).join("; ");
+    }
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return "";
+      }
+    }
+    return String(value);
+  };
+
+  const sanitizeCsvCell = (value: any) => {
+    const str = toExportString(value);
+    return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  };
+
+  const downloadCsv = (filename: string, rows: any[]) => {
+    const headers = ["name", "email", "major", "branch", "placed"];
+    const csvRows = [
+      headers.join(","),
+      ...rows.map((row) =>
+        [
+          sanitizeCsvCell(row.name),
+          sanitizeCsvCell(row.email),
+          sanitizeCsvCell(row.major),
+          sanitizeCsvCell(row.branch),
+          sanitizeCsvCell(row.placed ? "Yes" : "No"),
+        ].join(",")
+      ),
+    ];
+
+    const csvContent = csvRows.join("\r\n");
+    const blob = new Blob(["\uFEFF", csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   /* ---- Derived -------------------------------------------------- */
   const pendingRecruiters = recruiters.filter((r) => !r.isApproved);
   const approvedRecruiters = recruiters.filter((r) => r.isApproved);
@@ -155,36 +202,49 @@ export default function AdminPage() {
   const jobFillRate =
     jobs.length > 0 ? Math.round((jobsWithApps / jobs.length) * 100) : 0;
 
+  const normalizedStudents = students.map((student) => ({
+    ...student,
+    placed: placedStudentIds.has(student.id),
+  }));
+
+  const downloadAllStudentsCsv = () => {
+    downloadCsv("all-students.csv", normalizedStudents);
+  };
+
+  const downloadStudentsByMajorOrBranchCsv = () => {
+    const sortedRows = [...normalizedStudents].sort((a, b) => {
+      const aKey = String(a.major ?? a.branch ?? "unknown").toLowerCase();
+      const bKey = String(b.major ?? b.branch ?? "unknown").toLowerCase();
+      return aKey.localeCompare(bKey);
+    });
+
+    downloadCsv("students-by-major-branch.csv", sortedRows);
+  };
+
+  const downloadPlacedStudentsCsv = () => {
+    downloadCsv(
+      "placed-students.csv",
+      normalizedStudents.filter((student) => student.placed)
+    );
+  };
+
+  const downloadNotPlacedStudentsCsv = () => {
+    downloadCsv(
+      "not-placed-students.csv",
+      normalizedStudents.filter((student) => !student.placed)
+    );
+  };
+
   /* ---- Nav config ----------------------------------------------- */
-  const primaryNav = [
-    { key: "overview" as const, label: "Overview", icon: LayoutDashboardIcon },
-    { key: "recruiters" as const, label: "Recruiters", icon: ShieldCheckIcon },
-    { key: "upload" as const, label: "Upload", icon: UploadCloudIcon },
+  type ViewKey = typeof activeView;
+  const navItems: { key: ViewKey; label: string; icon: any; group: 1 | 2 | 3; badge?: number }[] = [
+    { key: "overview", label: "Overview", icon: LayoutDashboardIcon, group: 1 },
+    { key: "recruiters", label: "Recruiters", icon: ShieldCheckIcon, group: 1, badge: pendingRecruiters.length || undefined },
+    { key: "upload", label: "Upload", icon: UploadCloudIcon, group: 1 },
+    { key: "students", label: "Students", icon: UsersIcon, group: 2 },
+    { key: "jobs", label: "Jobs", icon: BriefcaseIcon, group: 2 },
+    { key: "documents", label: "Data Exports", icon: BarChart3Icon, group: 3 },
   ];
-
-  const secondaryNav = [
-    { key: "students" as const, label: "Students", icon: UsersIcon },
-    { key: "jobs" as const, label: "Jobs", icon: BriefcaseIcon },
-  ];
-
-  const tertiaryNav = [
-    { key: "documents" as const, label: "Documents", icon: FileTextIcon },
-    { key: "resources" as const, label: "Resources", icon: HelpCircleIcon },
-  ];
-
-  /* ---- Filtered students for search ----------------------------- */
-  const filteredStudents = students.filter(
-    (s) =>
-      (s.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.email ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.major ?? "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredJobs = jobs.filter(
-    (j) =>
-      (j.title ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (j.company ?? "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   /* ================================================================ */
   /*  RENDER                                                          */
@@ -213,67 +273,33 @@ export default function AdminPage() {
           <ChevronRightIcon className="ad-sb-profile-chev" />
         </div>
 
-        {/* Primary nav */}
-        <nav className="ad-sb-nav">
-          {primaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                className={`ad-sb-link${activeView === item.key ? " ad-sb-link-active" : ""}`}
-                onClick={() => setActiveView(item.key)}
-              >
-                <Icon className="ad-sb-link-icon" />
-                <span>{item.label}</span>
-                {item.key === "recruiters" && pendingRecruiters.length > 0 && (
-                  <span className="ad-sb-badge">
-                    {pendingRecruiters.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Divider */}
-        <div className="ad-sb-divider" />
-
-        {/* Secondary nav */}
-        <nav className="ad-sb-nav">
-          {secondaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                className={`ad-sb-link${activeView === item.key ? " ad-sb-link-active" : ""}`}
-                onClick={() => setActiveView(item.key)}
-              >
-                <Icon className="ad-sb-link-icon" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Divider */}
-        <div className="ad-sb-divider" />
-
-        {/* Tertiary nav */}
-        <nav className="ad-sb-nav">
-          {tertiaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                className={`ad-sb-link${activeView === item.key ? " ad-sb-link-active" : ""}`}
-                onClick={() => setActiveView(item.key)}
-              >
-                <Icon className="ad-sb-link-icon" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Nav groups */}
+        {([1, 2, 3] as const).map((group, gi) => {
+          const items = navItems.filter((n) => n.group === group);
+          return (
+            <div key={group}>
+              {gi > 0 && <div className="ad-sb-divider" />}
+              <nav className="ad-sb-nav">
+                {items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      className={`ad-sb-link${activeView === item.key ? " ad-sb-link-active" : ""}`}
+                      onClick={() => setActiveView(item.key)}
+                    >
+                      <Icon className="ad-sb-link-icon" />
+                      <span>{item.label}</span>
+                      {item.badge && item.badge > 0 && (
+                        <span className="ad-sb-badge">{item.badge}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          );
+        })}
 
         {/* Spacer */}
         <div className="ad-sb-spacer" />
@@ -297,8 +323,7 @@ export default function AdminPage() {
             {activeView === "upload" && "Upload"}
             {activeView === "students" && "Students"}
             {activeView === "jobs" && "Jobs"}
-            {activeView === "documents" && "Documents"}
-            {activeView === "resources" && "Resources"}
+            {activeView === "documents" && "Data Exports"}
           </h1>
 
           <div className="ad-topbar-right">
@@ -750,36 +775,26 @@ export default function AdminPage() {
             {/* ================== STUDENTS ================== */}
             {activeView === "students" && (
               <div className="ad-fade">
-                {/* Summary strip */}
-                <section className="ad-grid-3" style={{ marginBottom: '1.25rem' }}>
+                {/* Stats strip */}
+                <div className="ad-grid-3" style={{ marginBottom: '1rem' }}>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <GraduationCapIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-cyan)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">TOTAL STUDENTS</span>
-                      <span className="ad-exec-cell-value">{students.length}</span>
-                    </div>
+                    <h3 className="ad-card-label">Total Students</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem' }}>{students.length}</span>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <UserCheckIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-emerald)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">PLACED</span>
-                      <span className="ad-exec-cell-value">{placedCount}</span>
-                    </div>
+                    <h3 className="ad-card-label">Placed</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem', color: 'var(--ad-emerald)' }}>{placedCount}</span>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <UserXIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-red)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">UNPLACED</span>
-                      <span className="ad-exec-cell-value">{unplacedCount}</span>
-                    </div>
+                    <h3 className="ad-card-label">Unplaced</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem', color: 'var(--ad-red)' }}>{unplacedCount}</span>
                   </div>
-                </section>
+                </div>
 
-                {/* Student table */}
                 <div className="ad-card ad-card-full">
                   <div className="ad-card-head">
                     <h3 className="ad-card-label">All Students</h3>
-                    <span className="ad-count-pill">{filteredStudents.length} result{filteredStudents.length !== 1 ? 's' : ''}</span>
+                    <span className="ad-count-pill">{students.length} total</span>
                   </div>
                   <div className="ad-table-wrap">
                     <table className="ad-table">
@@ -790,40 +805,36 @@ export default function AdminPage() {
                           <th>Email</th>
                           <th>Major</th>
                           <th className="ad-th-narrow">CGPA</th>
+                          <th>Skills</th>
                           <th>Status</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredStudents.length === 0 ? (
-                          <tr><td colSpan={6} className="ad-td-empty">No students match your search</td></tr>
+                        {students.length === 0 ? (
+                          <tr><td colSpan={7} className="ad-td-empty">No students registered</td></tr>
                         ) : (
-                          filteredStudents.map((s, idx) => (
+                          students.map((s, idx) => (
                             <tr key={s.id}>
                               <td className="ad-td-index">{idx + 1}</td>
                               <td>
                                 <div className="ad-td-user">
-                                  <div className="ad-td-avatar">{(s.name ?? 'S')[0].toUpperCase()}</div>
-                                  {s.name ?? '—'}
+                                  <div className="ad-td-avatar">{(s.name ?? "S")[0].toUpperCase()}</div>
+                                  {s.name ?? "—"}
                                 </div>
                               </td>
-                              <td>{s.email ?? '—'}</td>
-                              <td>{s.major ?? '—'}</td>
-                              <td>{s.cgpa ?? '—'}</td>
+                              <td>{s.email ?? "—"}</td>
+                              <td>{s.major ?? s.branch ?? "—"}</td>
+                              <td>{s.cgpa ?? "—"}</td>
+                              <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {Array.isArray(s.skills) ? s.skills.join(", ") : (s.skills ?? "—")}
+                              </td>
                               <td>
                                 {placedStudentIds.has(s.id) ? (
-                                  <span className="ad-badge ad-badge-ok">
-                                    <span className="ad-status-dot ad-status-active" />
-                                    Placed
-                                  </span>
+                                  <span className="ad-badge ad-badge-ok"><span className="ad-status-dot ad-status-active" />Placed</span>
                                 ) : studentsWhoApplied.has(s.id) ? (
-                                  <span className="ad-badge ad-badge-warn">
-                                    <span className="ad-status-dot ad-status-pending" />
-                                    Applied
-                                  </span>
+                                  <span className="ad-badge ad-badge-warn"><span className="ad-status-dot ad-status-pending" />Applied</span>
                                 ) : (
-                                  <span className="ad-badge" style={{ color: 'var(--ad-muted)' }}>
-                                    — Not applied
-                                  </span>
+                                  <span className="ad-badge" style={{ color: 'var(--ad-muted)' }}>Not Applied</span>
                                 )}
                               </td>
                             </tr>
@@ -839,36 +850,156 @@ export default function AdminPage() {
             {/* ================== JOBS ================== */}
             {activeView === "jobs" && (
               <div className="ad-fade">
-                {/* Summary strip */}
-                <section className="ad-grid-3" style={{ marginBottom: '1.25rem' }}>
+                {/* Stats strip */}
+                <div className="ad-grid-3" style={{ marginBottom: '1rem' }}>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <BriefcaseIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-cyan)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">TOTAL JOBS</span>
-                      <span className="ad-exec-cell-value">{jobs.length}</span>
-                    </div>
+                    <h3 className="ad-card-label">Total Jobs</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem' }}>{jobs.length}</span>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <UsersIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-emerald)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">TOTAL APPLICATIONS</span>
-                      <span className="ad-exec-cell-value">{totalApplications}</span>
-                    </div>
+                    <h3 className="ad-card-label">Total Applications</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem', color: 'var(--ad-cyan)' }}>{totalApplications}</span>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <TrendingUpIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-amber)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">AVG APPS/JOB</span>
-                      <span className="ad-exec-cell-value">{appsPerJob}</span>
-                    </div>
+                    <h3 className="ad-card-label">Avg Applications/Job</h3>
+                    <span className="ad-exec-pct" style={{ fontSize: '2rem', display: 'block', marginTop: '0.3rem', color: 'var(--ad-amber)' }}>{appsPerJob}</span>
                   </div>
-                </section>
+                </div>
 
-                {/* Jobs table */}
+                {/* Job detail panel */}
+                {selectedJob && (() => {
+                  const jobApps = applications.filter((a) => a.jobId === selectedJob.id);
+                  const applicantStudents = jobApps.map((a) => {
+                    const stu = students.find((s) => s.id === a.studentId);
+                    return { ...a, student: stu };
+                  });
+                  return (
+                    <div className="ad-card ad-job-detail" style={{ marginBottom: '1rem' }}>
+                      <div className="ad-card-head">
+                        <h3 className="ad-card-label" style={{ fontSize: '1.1rem' }}>
+                          {selectedJob.title ?? "Untitled"}
+                        </h3>
+                        <button className="ad-detail-close" onClick={() => setSelectedJob(null)}>
+                          <XIcon style={{ width: '1rem', height: '1rem' }} />
+                        </button>
+                      </div>
+
+                      {/* Job metadata grid */}
+                      <div className="ad-detail-meta">
+                        <div className="ad-detail-meta-item">
+                          <Building2Icon className="ad-detail-meta-icon" />
+                          <div>
+                            <span className="ad-detail-meta-label">Company</span>
+                            <span className="ad-detail-meta-value">{selectedJob.company ?? "—"}</span>
+                          </div>
+                        </div>
+                        <div className="ad-detail-meta-item">
+                          <MapPinIcon className="ad-detail-meta-icon" />
+                          <div>
+                            <span className="ad-detail-meta-label">Location</span>
+                            <span className="ad-detail-meta-value">{selectedJob.location ?? "—"}</span>
+                          </div>
+                        </div>
+                        <div className="ad-detail-meta-item">
+                          <BriefcaseIcon className="ad-detail-meta-icon" />
+                          <div>
+                            <span className="ad-detail-meta-label">Salary</span>
+                            <span className="ad-detail-meta-value">{selectedJob.salaryRange ?? selectedJob.salary ?? "—"}</span>
+                          </div>
+                        </div>
+                        <div className="ad-detail-meta-item">
+                          <CalendarIcon className="ad-detail-meta-icon" />
+                          <div>
+                            <span className="ad-detail-meta-label">Type</span>
+                            <span className="ad-detail-meta-value">{selectedJob.type ?? selectedJob.jobType ?? "Full-time"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {selectedJob.description && (
+                        <div className="ad-detail-section">
+                          <h4 className="ad-detail-section-title">Description</h4>
+                          <p className="ad-detail-section-text">{selectedJob.description}</p>
+                        </div>
+                      )}
+
+                      {/* Requirements */}
+                      {(selectedJob.requirements || selectedJob.skills) && (
+                        <div className="ad-detail-section">
+                          <h4 className="ad-detail-section-title">Requirements</h4>
+                          <div className="ad-chip-row">
+                            {(Array.isArray(selectedJob.requirements)
+                              ? selectedJob.requirements
+                              : Array.isArray(selectedJob.skills)
+                              ? selectedJob.skills
+                              : String(selectedJob.requirements ?? selectedJob.skills ?? "").split(",")
+                            ).map((r: string, i: number) => (
+                              <span className="ad-chip" key={i}>{String(r).trim()}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Applicants table */}
+                      <div className="ad-detail-section">
+                        <h4 className="ad-detail-section-title">
+                          Applicants <span className="ad-count-pill" style={{ marginLeft: '0.5rem' }}>{jobApps.length}</span>
+                        </h4>
+                        {jobApps.length === 0 ? (
+                          <p style={{ color: 'var(--ad-muted)', fontSize: '0.85rem' }}>No applications for this job yet.</p>
+                        ) : (
+                          <div className="ad-table-wrap">
+                            <table className="ad-table">
+                              <thead>
+                                <tr>
+                                  <th className="ad-th-narrow">#</th>
+                                  <th>Student</th>
+                                  <th>Email</th>
+                                  <th>Major</th>
+                                  <th>Status</th>
+                                  <th>Applied</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {applicantStudents.map((a, i) => (
+                                  <tr key={a.id}>
+                                    <td className="ad-td-index">{i + 1}</td>
+                                    <td>
+                                      <div className="ad-td-user">
+                                        <div className="ad-td-avatar">{(a.student?.name ?? "S")[0].toUpperCase()}</div>
+                                        {a.student?.name ?? "Unknown"}
+                                      </div>
+                                    </td>
+                                    <td>{a.student?.email ?? a.studentEmail ?? "—"}</td>
+                                    <td>{a.student?.major ?? "—"}</td>
+                                    <td>
+                                      {["accepted", "placed", "offered", "hired"].includes((a.status ?? "").toLowerCase()) ? (
+                                        <span className="ad-badge ad-badge-ok"><span className="ad-status-dot ad-status-active" />{a.status}</span>
+                                      ) : ["rejected", "declined"].includes((a.status ?? "").toLowerCase()) ? (
+                                        <span className="ad-badge" style={{ color: 'var(--ad-red)' }}><span className="ad-status-dot" style={{ background: 'var(--ad-red)' }} />{a.status}</span>
+                                      ) : (
+                                        <span className="ad-badge ad-badge-warn"><span className="ad-status-dot ad-status-pending" />{a.status ?? "Pending"}</span>
+                                      )}
+                                    </td>
+                                    <td style={{ fontSize: '0.78rem', color: 'var(--ad-muted)' }}>
+                                      {a.appliedAt?.toDate ? a.appliedAt.toDate().toLocaleDateString() : "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="ad-card ad-card-full">
                   <div className="ad-card-head">
                     <h3 className="ad-card-label">All Job Listings</h3>
-                    <span className="ad-count-pill">{filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''}</span>
+                    <span className="ad-count-pill">{jobs.length} total</span>
                   </div>
                   <div className="ad-table-wrap">
                     <table className="ad-table">
@@ -884,22 +1015,27 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredJobs.length === 0 ? (
-                          <tr><td colSpan={7} className="ad-td-empty">No jobs match your search</td></tr>
+                        {jobs.length === 0 ? (
+                          <tr><td colSpan={7} className="ad-td-empty">No jobs posted yet</td></tr>
                         ) : (
-                          filteredJobs.map((job, idx) => {
+                          jobs.map((job, idx) => {
                             const jobApps = applications.filter((a) => a.jobId === job.id);
+                            const isSelected = selectedJob?.id === job.id;
                             return (
-                              <tr key={job.id}>
+                              <tr
+                                key={job.id}
+                                className={`ad-tr-clickable${isSelected ? " ad-tr-selected" : ""}`}
+                                onClick={() => setSelectedJob(isSelected ? null : job)}
+                              >
                                 <td className="ad-td-index">{idx + 1}</td>
-                                <td className="ad-td-bold">{job.title ?? 'Untitled'}</td>
-                                <td>{job.company ?? '—'}</td>
-                                <td>{job.salaryRange ?? job.salary ?? '—'}</td>
-                                <td>{job.location ?? '—'}</td>
+                                <td className="ad-td-bold">{job.title ?? "Untitled"}</td>
+                                <td>{job.company ?? "—"}</td>
+                                <td>{job.salaryRange ?? job.salary ?? "—"}</td>
+                                <td>{job.location ?? "—"}</td>
                                 <td>
                                   <span className="ad-count-pill">{jobApps.length}</span>
                                 </td>
-                                <td>{job.postedBy ?? '—'}</td>
+                                <td>{job.postedBy ?? "—"}</td>
                               </tr>
                             );
                           })
@@ -911,91 +1047,118 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* ================== DOCUMENTS ================== */}
+            {/* ================== DATA EXPORTS / DOCUMENTS ================== */}
             {activeView === "documents" && (
               <div className="ad-fade">
-                <div className="ad-card ad-card-full">
-                  <div className="ad-card-head">
-                    <h3 className="ad-card-label">Platform Documents</h3>
-                  </div>
-                  <div className="ad-docs-grid">
-                    {[
-                      { title: 'Placement Policy', desc: 'Rules, eligibility criteria, and placement process guidelines', icon: FileTextIcon, accent: 'var(--ad-cyan)' },
-                      { title: 'Student Handbook', desc: 'Information for students about registering, applying, and tracking jobs', icon: BookOpenIcon, accent: 'var(--ad-emerald)' },
-                      { title: 'Recruiter Guide', desc: 'Onboarding guide for recruiters to post jobs and manage applications', icon: ShieldCheckIcon, accent: 'var(--ad-violet)' },
-                      { title: 'CSV Upload Template', desc: 'Template file format for bulk uploading student data', icon: FileSpreadsheetIcon, accent: 'var(--ad-amber)' },
-                    ].map((d) => {
-                      const Icon = d.icon;
-                      return (
-                        <div className="ad-doc-card" key={d.title}>
-                          <div className="ad-doc-icon-wrap" style={{ color: d.accent }}>
-                            <Icon style={{ width: '1.3rem', height: '1.3rem' }} />
-                          </div>
-                          <div className="ad-doc-info">
-                            <span className="ad-doc-title">{d.title}</span>
-                            <span className="ad-doc-desc">{d.desc}</span>
-                          </div>
-                          <ExternalLinkIcon className="ad-doc-link-icon" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ================== RESOURCES ================== */}
-            {activeView === "resources" && (
-              <div className="ad-fade">
-                {/* Stats summary */}
-                <section className="ad-grid-3" style={{ marginBottom: '1.25rem' }}>
+                <section className="ad-grid-3" style={{ marginBottom: "1.25rem" }}>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <UsersIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-cyan)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">RECRUITERS</span>
-                      <span className="ad-exec-cell-value">{recruiters.length}</span>
+                    <div className="ad-exec-cell" style={{ border: "none", padding: 0 }}>
+                      <UsersIcon
+                        style={{
+                          width: "1.2rem",
+                          height: "1.2rem",
+                          color: "var(--ad-cyan)",
+                          marginBottom: "0.3rem",
+                        }}
+                      />
+                      <span className="ad-exec-cell-label">TOTAL STUDENTS</span>
+                      <span className="ad-exec-cell-value">{students.length}</span>
                     </div>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <ShieldCheckIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-emerald)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">APPROVED</span>
-                      <span className="ad-exec-cell-value">{approvedRecruiters.length}</span>
+                    <div className="ad-exec-cell" style={{ border: "none", padding: 0 }}>
+                      <UserCheckIcon
+                        style={{
+                          width: "1.2rem",
+                          height: "1.2rem",
+                          color: "var(--ad-emerald)",
+                          marginBottom: "0.3rem",
+                        }}
+                      />
+                      <span className="ad-exec-cell-label">PLACED STUDENTS</span>
+                      <span className="ad-exec-cell-value">{placedCount}</span>
                     </div>
                   </div>
                   <div className="ad-card">
-                    <div className="ad-exec-cell" style={{ border: 'none', padding: 0 }}>
-                      <ClockIcon style={{ width: '1.2rem', height: '1.2rem', color: 'var(--ad-amber)', marginBottom: '0.3rem' }} />
-                      <span className="ad-exec-cell-label">PENDING APPROVAL</span>
-                      <span className="ad-exec-cell-value">{pendingRecruiters.length}</span>
+                    <div className="ad-exec-cell" style={{ border: "none", padding: 0 }}>
+                      <UserXIcon
+                        style={{
+                          width: "1.2rem",
+                          height: "1.2rem",
+                          color: "var(--ad-red)",
+                          marginBottom: "0.3rem",
+                        }}
+                      />
+                      <span className="ad-exec-cell-label">NOT PLACED</span>
+                      <span className="ad-exec-cell-value">{unplacedCount}</span>
                     </div>
                   </div>
                 </section>
 
-                {/* Helpful links */}
                 <div className="ad-card ad-card-full">
                   <div className="ad-card-head">
-                    <h3 className="ad-card-label">Helpful Resources</h3>
+                    <h3 className="ad-card-label">Student Data Exports</h3>
+                    <span className="ad-count-pill">4 CSV downloads</span>
                   </div>
-                  <div className="ad-docs-grid">
+                  <p className="ad-upload-desc" style={{ marginBottom: "0.9rem", maxWidth: "none" }}>
+                    Download complete student datasets or placement-specific reports in CSV format.
+                  </p>
+                  <div className="ad-action-grid">
                     {[
-                      { title: 'Firebase Console', desc: 'Access Firestore database, authentication, and storage', icon: ExternalLinkIcon, accent: 'var(--ad-amber)' },
-                      { title: 'Admin API Docs', desc: 'Backend API reference for student uploads and job management', icon: BookOpenIcon, accent: 'var(--ad-cyan)' },
-                      { title: 'Placement Reports', desc: 'Generate and download CSV reports of placement data', icon: FileSpreadsheetIcon, accent: 'var(--ad-emerald)' },
-                      { title: 'Support & FAQ', desc: 'Common issues, troubleshooting, and contact information', icon: HelpCircleIcon, accent: 'var(--ad-violet)' },
-                    ].map((d) => {
-                      const Icon = d.icon;
+                      {
+                        title: "Download all students data as CSV",
+                        desc: "Exports all student records into one file.",
+                        icon: FileSpreadsheetIcon,
+                        accent: "var(--ad-emerald)",
+                        onClick: downloadAllStudentsCsv,
+                      },
+                      {
+                        title: "Download students data by major/branch as CSV",
+                        desc: "Exports separate CSV files grouped by major or branch.",
+                        icon: BarChart3Icon,
+                        accent: "var(--ad-cyan)",
+                        onClick: downloadStudentsByMajorOrBranchCsv,
+                      },
+                      {
+                        title: "Download placed students data as CSV",
+                        desc: "Exports students who got placed.",
+                        icon: UserCheckIcon,
+                        accent: "var(--ad-amber)",
+                        onClick: downloadPlacedStudentsCsv,
+                      },
+                      {
+                        title: "Download students who did not get placed as CSV",
+                        desc: "Exports students who are not placed.",
+                        icon: UserXIcon,
+                        accent: "var(--ad-red)",
+                        onClick: downloadNotPlacedStudentsCsv,
+                      },
+                    ].map((item) => {
+                      const Icon = item.icon;
                       return (
-                        <div className="ad-doc-card" key={d.title}>
-                          <div className="ad-doc-icon-wrap" style={{ color: d.accent }}>
-                            <Icon style={{ width: '1.3rem', height: '1.3rem' }} />
+                        <button
+                          type="button"
+                          className="ad-action-tile"
+                          key={item.title}
+                          onClick={item.onClick}
+                          style={{
+                            justifyContent: "flex-start",
+                            alignItems: "flex-start",
+                            minHeight: "4rem",
+                            padding: "0.8rem",
+                          }}
+                        >
+                          <Icon
+                            className="ad-action-tile-icon"
+                            style={{ color: item.accent, width: "1rem", height: "1rem", marginTop: "0.15rem" }}
+                          />
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.22rem", textAlign: "left" }}>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>{item.title}</span>
+                            <span className="ad-task-secondary" style={{ fontSize: "0.74rem" }}>
+                              {item.desc}
+                            </span>
                           </div>
-                          <div className="ad-doc-info">
-                            <span className="ad-doc-title">{d.title}</span>
-                            <span className="ad-doc-desc">{d.desc}</span>
-                          </div>
-                          <ExternalLinkIcon className="ad-doc-link-icon" />
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
