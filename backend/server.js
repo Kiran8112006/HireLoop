@@ -70,7 +70,8 @@ app.post('/verify-payment', async (req, res) => {
         const collectionName =
         orderType === "subscription" ? "students" : "recruiters";
         
-        await db.collection(collectionName).doc(orderDetails.notes.user_id).set(
+        // Update recruiter document with payment info
+        await db.collection(collectionName).doc(uid).set(
         {
             paymentDone: true,
             paymentId: razorpay_payment_id,
@@ -79,12 +80,124 @@ app.post('/verify-payment', async (req, res) => {
         },
         { merge: true }
         );
+
+        // For recruiters, create a credits purchase history entry
+        if (orderType !== "subscription") {
+            const amount = orderDetails.amount / 100; // Convert from paise to rupees
+            // Credit conversion: 1 credit = 500 INR
+            const creditsAdded = amount / 500;
+            
+            // Add entry to credits subcollection
+            await db.collection(collectionName).doc(uid).collection("credits").add({
+                type: "purchase",
+                creditsAdded: creditsAdded,
+                amount: amount,
+                currency: orderDetails.currency,
+                paymentId: razorpay_payment_id,
+                orderId: razorpay_order_id,
+                timestamp: new Date(),
+                description: `Purchased ${creditsAdded} credits for ₹${amount}`
+            });
+
+            // Update total credits in recruiter document
+            const recruiterDoc = await db.collection("recruiters").doc(uid).get();
+            const currentCredits = recruiterDoc.data()?.credits || 0;
+            
+            await db.collection("recruiters").doc(uid).update({
+                credits: currentCredits + creditsAdded
+            });
+        }
         
         return res.status(200).json({ message: "Payment verified successfully" });
     } else {
         return res.status(400).json({ message: "Invalid signature sent!" });
     }
 });
+
+// Endpoint to track credit usage (deduct credits when recruiter uses them)
+app.post('/deduct-credits', async (req, res) => {
+  try {
+    const { recruiterId, creditsUsed, action, metadata } = req.body;
+
+    if (!recruiterId || !creditsUsed || !action) {
+      return res.status(400).json({ error: "Missing required fields: recruiterId, creditsUsed, action" });
+    }
+
+    const recruiterRef = db.collection("recruiters").doc(recruiterId);
+    const recruiterDoc = await recruiterRef.get();
+
+    if (!recruiterDoc.exists()) {
+      return res.status(404).json({ error: "Recruiter not found" });
+    }
+
+    const currentCredits = recruiterDoc.data()?.credits || 0;
+
+    if (currentCredits < creditsUsed) {
+      return res.status(400).json({ error: "Insufficient credits" });
+    }
+
+    // Add entry to credits usage subcollection
+    await recruiterRef.collection("credits").add({
+      type: "usage",
+      creditsUsed: creditsUsed,
+      action: action, // e.g., "post_job", "send_interview", "contact_student"
+      timestamp: new Date(),
+      metadata: metadata || {}, // Can store additional info like jobId, studentId, etc.
+      description: `Used ${creditsUsed} credits for ${action}`
+    });
+
+    // Update total credits
+    await recruiterRef.update({
+      credits: currentCredits - creditsUsed
+    });
+
+    return res.status(200).json({ 
+      message: "Credits deducted successfully",
+      remainingCredits: currentCredits - creditsUsed
+    });
+  } catch (err) {
+    console.error("Error deducting credits:", err);
+    res.status(500).json({ error: "Failed to deduct credits" });
+  }
+});
+
+// Endpoint to get credit history for a recruiter
+app.get('/credits-history/:recruiterId', async (req, res) => {
+  try {
+    const { recruiterId } = req.params;
+
+    const recruiterRef = db.collection("recruiters").doc(recruiterId);
+    const recruiterDoc = await recruiterRef.get();
+
+    if (!recruiterDoc.exists()) {
+      return res.status(404).json({ error: "Recruiter not found" });
+    }
+
+    // Get all credit transactions (both purchases and usage)
+    const creditsSnapshot = await recruiterRef.collection("credits")
+      .orderBy("timestamp", "desc")
+      .get();
+
+    const transactions = creditsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+    }));
+
+    const totalCredits = recruiterDoc.data()?.credits || 0;
+
+    return res.status(200).json({
+      recruiterId,
+      totalCredits,
+      transactions,
+      transactionCount: transactions.length
+    });
+  } catch (err) {
+    console.error("Error fetching credits history:", err);
+    res.status(500).json({ error: "Failed to fetch credits history" });
+  }
+});
+
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   try {
 
