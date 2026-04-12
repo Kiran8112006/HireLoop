@@ -171,6 +171,63 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.post("/post-job", async (req, res) => {
+  try {
+    const { uid, companyName, title, description, startDate, endDate } = req.body;
+    if (!uid || !companyName || !title || !description || !startDate || !endDate) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
+
+    if (!uid) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // 🔥 Get recruiter
+    const recruiterRef = db.collection("recruiters").doc(uid);
+    const recruiterSnap = await recruiterRef.get();
+
+    if (!recruiterSnap.exists) {
+      return res.status(404).json({ message: "Recruiter not found" });
+    }
+
+    const recruiterData = recruiterSnap.data();
+    const credits = recruiterData.credits || 0;
+
+    // ❌ No credits
+    if (credits <= 0) {
+      return res.status(403).json({
+        message: "No credits available. Please make payment.",
+      });
+    }
+
+    // ✅ Create job
+    const jobRef = await db.collection("jobs").add({
+    companyName,
+    title,
+    description,
+    startDate,
+    endDate,
+    recruiterId: uid,
+    createdAt: new Date(),
+    });
+
+    // ➖ Deduct credit
+    await recruiterRef.update({
+      credits: admin.firestore.FieldValue.increment(-1),
+    });
+
+    return res.status(200).json({
+      message: "Job posted successfully",
+      jobId: jobRef.id,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 app.listen(5000, () => console.log("Server running on port 5000"));
