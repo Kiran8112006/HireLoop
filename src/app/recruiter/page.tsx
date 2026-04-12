@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { collection, getDocs, query, where, doc, getDoc, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, orderBy, updateDoc } from "firebase/firestore";
 import {
   Building2Icon,
   BriefcaseIcon,
@@ -39,6 +39,11 @@ export default function RecruiterPage() {
   const [activeView, setActiveView] = useState<"overview" | "jobs" | "post-job" | "credits">("overview");
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [savingApplicantId, setSavingApplicantId] = useState<string | null>(null);
+  const [scheduleOpenByApplicant, setScheduleOpenByApplicant] = useState<Record<string, boolean>>({});
+  const [scheduleFormByApplicant, setScheduleFormByApplicant] = useState<
+    Record<string, { date: string; time: string; mode: string; meetingLink: string; notes: string }>
+  >({});
 
   // Post Job State
   const [title, setTitle] = useState("");
@@ -112,6 +117,7 @@ export default function RecruiterPage() {
 
   const fetchApplicants = async (jobId: string) => {
     setApplicants([]);
+    setScheduleOpenByApplicant({});
     const q = query(
       collection(db, "applications"),
       where("jobId", "==", jobId)
@@ -131,6 +137,7 @@ export default function RecruiterPage() {
           ...(studentData || {}),
           applicationStatus: appData.status,
           applicationResume: appData.resume,
+          interview: appData.interview,
         });
       }
     }
@@ -213,6 +220,97 @@ export default function RecruiterPage() {
   const openJobApplicants = (job: any) => {
     setSelectedJob(job);
     fetchApplicants(job.id);
+  };
+
+  const handleShortlistApplicant = async (applicationId: string) => {
+    try {
+      setSavingApplicantId(applicationId);
+      await updateDoc(doc(db, "applications", applicationId), {
+        status: "shortlisted",
+        shortlistedAt: new Date(),
+      });
+
+      setApplicants((prev) =>
+        prev.map((app) =>
+          app.id === applicationId
+            ? { ...app, applicationStatus: "shortlisted" }
+            : app
+        )
+      );
+      setScheduleOpenByApplicant((prev) => ({ ...prev, [applicationId]: true }));
+    } catch (err) {
+      console.error("Failed to shortlist applicant", err);
+      alert("Unable to shortlist applicant. Please try again.");
+    } finally {
+      setSavingApplicantId(null);
+    }
+  };
+
+  const handleScheduleInterview = async (applicationId: string) => {
+    const draft = scheduleFormByApplicant[applicationId] || {
+      date: "",
+      time: "",
+      mode: "Online",
+      meetingLink: "",
+      notes: "",
+    };
+
+    if (!draft.date || !draft.time) {
+      alert("Please select interview date and time.");
+      return;
+    }
+
+    if (draft.mode.toLowerCase() === "online" && !draft.meetingLink.trim()) {
+      alert("Please add meeting link for online interviews.");
+      return;
+    }
+
+    try {
+      setSavingApplicantId(applicationId);
+      await updateDoc(doc(db, "applications", applicationId), {
+        status: "interview_scheduled",
+        interview: {
+          date: draft.date,
+          time: draft.time,
+          mode: draft.mode,
+          meetingLink: draft.meetingLink.trim(),
+          notes: draft.notes.trim(),
+          scheduledAt: new Date(),
+        },
+      });
+
+      setApplicants((prev) =>
+        prev.map((app) =>
+          app.id === applicationId
+            ? {
+                ...app,
+                applicationStatus: "interview_scheduled",
+                interview: {
+                  date: draft.date,
+                  time: draft.time,
+                  mode: draft.mode,
+                  meetingLink: draft.meetingLink.trim(),
+                  notes: draft.notes.trim(),
+                },
+              }
+            : app
+        )
+      );
+
+      alert("Interview scheduled successfully.");
+    } catch (err) {
+      console.error("Failed to schedule interview", err);
+      alert("Unable to schedule interview. Please try again.");
+    } finally {
+      setSavingApplicantId(null);
+    }
+  };
+
+  const getStatusLabel = (status: string | undefined) => {
+    const normalized = (status || "applied").toLowerCase();
+    if (normalized === "interview_scheduled") return "Interview Scheduled";
+    if (normalized === "shortlisted") return "Shortlisted";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   };
 
   const filteredJobs = jobs.filter(
@@ -524,13 +622,15 @@ export default function RecruiterPage() {
                           <th>Email</th>
                           <th>CGPA</th>
                           <th>Skills</th>
+                          <th>Status</th>
                           <th>Resume</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {applicants.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="ad-td-empty">
+                            <td colSpan={8} className="ad-td-empty">
                               No applicants yet for this listing.
                             </td>
                           </tr>
@@ -543,6 +643,14 @@ export default function RecruiterPage() {
                               <td style={{ color: 'var(--ad-muted)' }}>{app.cgpa ?? "—"}</td>
                               <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--ad-muted)' }}>
                                 {app.skills?.join(", ") ?? "—"}
+                              </td>
+                              <td style={{ color: 'var(--ad-text)', fontWeight: 600 }}>
+                                {getStatusLabel(app.applicationStatus)}
+                                {app.interview?.date && app.interview?.time && (
+                                  <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', fontWeight: 400, color: 'var(--ad-muted)' }}>
+                                    {app.interview.date} at {app.interview.time}
+                                  </div>
+                                )}
                               </td>
                               <td>
                                 {app.resume || app.applicationResume ? (
@@ -558,6 +666,132 @@ export default function RecruiterPage() {
                                 ) : (
                                   <span className="ad-muted">—</span>
                                 )}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '250px' }}>
+                                  <button
+                                    className="ad-task-action"
+                                    disabled={savingApplicantId === app.id || app.applicationStatus === "shortlisted" || app.applicationStatus === "interview_scheduled"}
+                                    style={{ opacity: (savingApplicantId === app.id || app.applicationStatus === "shortlisted" || app.applicationStatus === "interview_scheduled") ? 0.6 : 1 }}
+                                    onClick={() => handleShortlistApplicant(app.id)}
+                                  >
+                                    {app.applicationStatus === "shortlisted" || app.applicationStatus === "interview_scheduled" ? "Shortlisted" : "Shortlist"}
+                                  </button>
+
+                                  {(app.applicationStatus === "shortlisted" || app.applicationStatus === "interview_scheduled") && (
+                                    <button
+                                      className="ad-task-action"
+                                      onClick={() =>
+                                        setScheduleOpenByApplicant((prev) => ({
+                                          ...prev,
+                                          [app.id]: !prev[app.id],
+                                        }))
+                                      }
+                                    >
+                                      {scheduleOpenByApplicant[app.id]
+                                        ? "Hide Interview Form"
+                                        : app.applicationStatus === "interview_scheduled"
+                                        ? "Reschedule Interview"
+                                        : "Schedule Interview"}
+                                    </button>
+                                  )}
+
+                                  {(app.applicationStatus === "shortlisted" || app.applicationStatus === "interview_scheduled") && scheduleOpenByApplicant[app.id] && (
+                                    <>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                                        <CalendarInput
+                                          value={scheduleFormByApplicant[app.id]?.date ?? app.interview?.date ?? ""}
+                                          onChange={(val) =>
+                                            setScheduleFormByApplicant((prev) => ({
+                                              ...prev,
+                                              [app.id]: {
+                                                date: val,
+                                                time: prev[app.id]?.time ?? app.interview?.time ?? "",
+                                                mode: prev[app.id]?.mode ?? app.interview?.mode ?? "Online",
+                                                meetingLink: prev[app.id]?.meetingLink ?? app.interview?.meetingLink ?? "",
+                                                notes: prev[app.id]?.notes ?? app.interview?.notes ?? "",
+                                              },
+                                            }))
+                                          }
+                                          placeholder="Interview date"
+                                        />
+                                        <Input
+                                          type="time"
+                                          value={scheduleFormByApplicant[app.id]?.time ?? app.interview?.time ?? ""}
+                                          onChange={(e) =>
+                                            setScheduleFormByApplicant((prev) => ({
+                                              ...prev,
+                                              [app.id]: {
+                                                date: prev[app.id]?.date ?? app.interview?.date ?? "",
+                                                time: e.target.value,
+                                                mode: prev[app.id]?.mode ?? app.interview?.mode ?? "Online",
+                                                meetingLink: prev[app.id]?.meetingLink ?? app.interview?.meetingLink ?? "",
+                                                notes: prev[app.id]?.notes ?? app.interview?.notes ?? "",
+                                              },
+                                            }))
+                                          }
+                                        />
+                                      </div>
+
+                                      <Input
+                                        placeholder="Mode (Online / Offline)"
+                                        value={scheduleFormByApplicant[app.id]?.mode ?? app.interview?.mode ?? "Online"}
+                                        onChange={(e) =>
+                                          setScheduleFormByApplicant((prev) => ({
+                                            ...prev,
+                                            [app.id]: {
+                                              date: prev[app.id]?.date ?? app.interview?.date ?? "",
+                                              time: prev[app.id]?.time ?? app.interview?.time ?? "",
+                                              mode: e.target.value,
+                                              meetingLink: prev[app.id]?.meetingLink ?? app.interview?.meetingLink ?? "",
+                                              notes: prev[app.id]?.notes ?? app.interview?.notes ?? "",
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <Input
+                                        placeholder="Meeting link / location"
+                                        value={scheduleFormByApplicant[app.id]?.meetingLink ?? app.interview?.meetingLink ?? ""}
+                                        onChange={(e) =>
+                                          setScheduleFormByApplicant((prev) => ({
+                                            ...prev,
+                                            [app.id]: {
+                                              date: prev[app.id]?.date ?? app.interview?.date ?? "",
+                                              time: prev[app.id]?.time ?? app.interview?.time ?? "",
+                                              mode: prev[app.id]?.mode ?? app.interview?.mode ?? "Online",
+                                              meetingLink: e.target.value,
+                                              notes: prev[app.id]?.notes ?? app.interview?.notes ?? "",
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <Textarea
+                                        placeholder="Interview notes"
+                                        value={scheduleFormByApplicant[app.id]?.notes ?? app.interview?.notes ?? ""}
+                                        onChange={(e) =>
+                                          setScheduleFormByApplicant((prev) => ({
+                                            ...prev,
+                                            [app.id]: {
+                                              date: prev[app.id]?.date ?? app.interview?.date ?? "",
+                                              time: prev[app.id]?.time ?? app.interview?.time ?? "",
+                                              mode: prev[app.id]?.mode ?? app.interview?.mode ?? "Online",
+                                              meetingLink: prev[app.id]?.meetingLink ?? app.interview?.meetingLink ?? "",
+                                              notes: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      <button
+                                        className="ad-task-action"
+                                        disabled={savingApplicantId === app.id}
+                                        style={{ opacity: savingApplicantId === app.id ? 0.6 : 1 }}
+                                        onClick={() => handleScheduleInterview(app.id)}
+                                      >
+                                        {savingApplicantId === app.id ? "Saving..." : "Save Interview Schedule"}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))
