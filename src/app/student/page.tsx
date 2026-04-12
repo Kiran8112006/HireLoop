@@ -13,6 +13,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import PaymentButton from "../payment/payment";
+import AIResumeAdvisor from "@/components/AIResumeAdvisor";
 
 export default function StudentPage() {
   const [user, setUser] = useState<any>(null);
@@ -25,6 +26,10 @@ export default function StudentPage() {
   const [atsScore, setAtsScore] = useState<number | null>(null);
   const [atsSummary, setAtsSummary] = useState("");
   const [atsError, setAtsError] = useState("");
+  const [atsStrengths, setAtsStrengths] = useState<string[]>([]);
+  const [atsWeaknesses, setAtsWeaknesses] = useState<string[]>([]);
+  const [atsSkills, setAtsSkills] = useState<string[]>([]);
+  const [atsExperience, setAtsExperience] = useState<number>(0);
 
   // 🔥 FETCH STUDENT
   useEffect(() => {
@@ -147,6 +152,10 @@ export default function StudentPage() {
     setAtsError("");
     setAtsScore(null);
     setAtsSummary("");
+    setAtsStrengths([]);
+    setAtsWeaknesses([]);
+    setAtsSkills([]);
+    setAtsExperience(0);
 
     try {
       const formData = new FormData();
@@ -166,6 +175,10 @@ export default function StudentPage() {
       const data = await response.json();
       setAtsScore(typeof data?.job_fit_score === "number" ? data.job_fit_score : null);
       setAtsSummary(typeof data?.summary === "string" ? data.summary : "");
+      setAtsSkills(Array.isArray(data?.skills) ? data.skills : []);
+      setAtsStrengths(Array.isArray(data?.strengths) ? data.strengths : []);
+      setAtsWeaknesses(Array.isArray(data?.weaknesses) ? data.weaknesses : []);
+      setAtsExperience(typeof data?.years_experience === "number" ? data.years_experience : 0);
     } catch (err) {
       console.error(err);
       setAtsError("Unable to get ATS score. Check backend server on port 5000.");
@@ -252,6 +265,17 @@ export default function StudentPage() {
       {atsScore !== null && <p><b>ATS Score:</b> {atsScore}%</p>}
       {atsSummary && <p><b>Summary:</b> {atsSummary}</p>}
       {atsError && <p style={{ color: "red" }}>{atsError}</p>}
+
+      {/* AI RESUME ADVISOR */}
+      <AIResumeAdvisor
+        atsScore={atsScore}
+        atsJobTitle={atsJobTitle}
+        atsSummary={atsSummary}
+        skillsFound={atsSkills}
+        yearsExperience={atsExperience}
+        strengths={atsStrengths}
+        weaknesses={atsWeaknesses}
+      />
 
       <br/>
       <h2> For premium users: Pay here</h2>

@@ -149,5 +149,89 @@ function calculateATSScore(jdKeywords, resumeText) {
   return { score, matched, missing };
 }
 
+// 🤖 AI RESUME GUIDANCE ENDPOINT
+router.post("/get-resume-guidance", async (req, res) => {
+  try {
+    const { atsScore, jobTitle, summary, skills, yearsExperience, strengths, weaknesses } = req.body;
+
+    if (!atsScore || !jobTitle) {
+      return res.status(400).json({ error: "Missing required fields: atsScore, jobTitle" });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `You are an expert career coach and resume strategist. Based on the ATS analysis results below, provide personalized guidance to help the candidate improve their resume and career prospects.
+
+=== CANDIDATE ATS ANALYSIS RESULTS ===
+Job Title: ${jobTitle}
+Professional Summary: ${summary}
+ATS Match Score: ${atsScore}%
+Years of Experience: ${yearsExperience}
+Skills Found: ${skills.join(", ") || "Not listed"}
+Key Strengths: ${strengths.join("; ") || "Not provided"}
+Areas of Weakness: ${weaknesses.join("; ") || "Not provided"}
+
+=== YOUR TASK ===
+Generate ACTIONABLE, PERSONALIZED career coaching guidance based on:
+1. The ATS score (higher score = better match, lower = needs improvement)
+2. The candidate's strengths and weaknesses
+3. The target job title and requirements
+4. The candidate's experience level
+
+Be ENCOURAGING but REALISTIC. Provide specific, actionable advice tailored to their situation.
+
+=== OUTPUT REQUIREMENTS ===
+Return ONLY valid JSON (no markdown, no code blocks):
+
+{
+  "overall_assessment": "A 2-3 sentence personalized assessment of their candidacy for the ${jobTitle} role. Be honest but encouraging.",
+  "improvement_suggestions": [
+    "Specific, actionable suggestion 1 (address specific gaps or weaknesses)",
+    "Specific, actionable suggestion 2 (formatting, skills, experience)",
+    "Specific, actionable suggestion 3 (keywords, achievements to highlight)",
+    "Specific, actionable suggestion 4 (certifications or learning opportunities)"
+  ],
+  "skill_gaps": [
+    "Specific skill to develop or learn (with reasoning)",
+    "Another skill or tool mentioned in job requirements but missing"
+  ],
+  "interview_tips": [
+    "Tip 1: How to talk about their strengths in an interview",
+    "Tip 2: How to address or explain their weaknesses constructively",
+    "Tip 3: Key talking points for this specific role",
+    "Tip 4: Question they should prepare to answer"
+  ],
+  "next_steps": [
+    "Immediate action (within 1 week)",
+    "Short-term action (1-4 weeks)",
+    "Medium-term action (1-3 months)",
+    "Long-term career development"
+  ],
+  "motivation_message": "An inspiring, personalized message encouraging them based on their ATS score and potential. 15-25 words."
+}
+
+CRITICAL RULES:
+1. Match the tone to the ATS score:
+   - 80+: They're a strong candidate, focus on optimizations and confidence
+   - 60-79: They're competitive, focus on targeted improvements
+   - Below 60: They have potential, focus on systematic development and learning
+2. Make suggestions specific to the "${jobTitle}" role
+3. Be honest about gaps but constructive in tone
+4. Return ONLY the JSON object, nothing else`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    const cleanJson = text.replace(/```json|```/g, "").trim();
+    const guidanceData = JSON.parse(cleanJson);
+
+    res.json(guidanceData);
+  } catch (error) {
+    console.error("AI Guidance Error:", error);
+    res.status(500).json({ error: "Failed to generate AI guidance" });
+  }
+});
+
 // Export using ES6 syntax
 export { extractKeywords, calculateATSScore };

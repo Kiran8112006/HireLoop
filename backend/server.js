@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import atsRouter from './ats.js';
+import { generateMockQuestions, evaluateAnswer } from './mockinterview.js';
 import multer from "multer";
 import csv from "csv-parser";
 import fs from "fs";
@@ -339,6 +340,41 @@ app.post("/post-job", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ============== MOCK INTERVIEW API ROUTES ==============
+
+app.post("/mock/questions", async (req, res) => {
+  try {
+    const { jobRole, experienceLevel, skills } = req.body;
+
+    if (!jobRole || !experienceLevel) {
+      return res.status(400).json({ error: "jobRole and experienceLevel are required" });
+    }
+
+    const questions = await generateMockQuestions(jobRole, experienceLevel, skills || []);
+    res.status(200).json({ questions });
+  } catch (error) {
+    console.error("Error generating questions:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/mock/evaluate", async (req, res) => {
+  try {
+    const { question, userAnswer } = req.body;
+
+    if (!question || !userAnswer) {
+      return res.status(400).json({ error: "question and userAnswer are required" });
+    }
+
+    const feedback = await evaluateAnswer(question, userAnswer);
+    res.status(200).json(feedback);
+  } catch (error) {
+    console.error("Error evaluating answer:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
