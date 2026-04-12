@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -33,4 +33,18 @@ export const loginUser = async (email: string, password: string) => {
 
   // ❌ If no role found
   throw new Error("User role not found");
+};
+
+export const sendResetPasswordEmail = async (email: string, continueUrl?: string) => {
+  const normalizedEmail = email.trim();
+
+  if (!normalizedEmail) {
+    throw new Error("Please enter your email address first.");
+  }
+
+  await sendPasswordResetEmail(
+    auth,
+    normalizedEmail,
+    continueUrl ? { url: continueUrl, handleCodeInApp: false } : undefined
+  );
 };

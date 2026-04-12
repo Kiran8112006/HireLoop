@@ -210,6 +210,17 @@ body {
   width: 100%;
 }
 
+.auth-forgot-btn,
+.auth-forgot-btn.ui-btn-ghost {
+  color: #ffffff;
+}
+
+.auth-forgot-btn:hover,
+.auth-forgot-btn.ui-btn-ghost:hover {
+  color: #ffffff;
+  background: rgba(148, 163, 184, 0.14);
+}
+
 .ui-btn {
   display: inline-flex;
   align-items: center;
@@ -1807,7 +1818,7 @@ html {
 /* Metadata grid */
 .ad-detail-meta {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.75rem;
   margin-bottom: 1.1rem;
   padding-bottom: 1rem;
