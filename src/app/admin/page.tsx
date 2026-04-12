@@ -19,7 +19,6 @@ import {
   LogOutIcon,
   ChevronRightIcon,
   XIcon,
-  MapPinIcon,
   CalendarIcon,
   SearchIcon,
   BellIcon,
@@ -175,7 +174,8 @@ export default function AdminPage() {
   const filteredRecruiters = recruiters.filter(
     (r) =>
       (r.email ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.company ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+      (r.company ?? r.companyName ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.recruiterName ?? r.name ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   /* ---- Placement analytics -------------------------------------- */
@@ -651,12 +651,19 @@ export default function AdminPage() {
                               <td>
                                 <div className="ad-td-user">
                                   <div className="ad-td-avatar">
-                                    {(rec.email ?? "R")[0].toUpperCase()}
+                                    {(rec.recruiterName ?? rec.name ?? rec.email ?? "R")[0].toUpperCase()}
                                   </div>
-                                  {rec.email ?? "—"}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                                    <span style={{ fontWeight: 500, color: 'var(--ad-text)' }}>
+                                      {rec.recruiterName ?? rec.name ?? "—"}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--ad-muted)' }}>
+                                      {rec.email ?? "—"}
+                                    </span>
+                                  </div>
                                 </div>
                               </td>
-                              <td>{rec.company ?? "—"}</td>
+                              <td>{rec.company ?? rec.companyName ?? "—"}</td>
                               <td>
                                 {rec.isApproved ? (
                                   <span className="ad-badge ad-badge-ok">
@@ -755,15 +762,18 @@ export default function AdminPage() {
                             </td>
                           </tr>
                         ) : (
-                          students.slice(0, 25).map((s, idx) => (
-                            <tr key={s.id}>
-                              <td className="ad-td-index">{idx + 1}</td>
-                              <td>{s.name ?? "—"}</td>
-                              <td>{s.email ?? "—"}</td>
-                              <td>{s.major ?? "—"}</td>
-                              <td>{s.cgpa ?? "—"}</td>
-                            </tr>
-                          ))
+                          students.slice(0, 25).map((s, idx) => {
+                            const name = s.name ?? s.fullName ?? (s.firstName ? `${s.firstName} ${s.lastName ?? ""}`.trim() : null) ?? "—";
+                            return (
+                              <tr key={s.id}>
+                                <td className="ad-td-index">{idx + 1}</td>
+                                <td>{name}</td>
+                                <td>{s.email ?? s.contactEmail ?? "—"}</td>
+                                <td>{s.major ?? s.branch ?? s.department ?? "—"}</td>
+                                <td>{s.cgpa ?? s.gpa ?? "—"}</td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
@@ -813,22 +823,24 @@ export default function AdminPage() {
                         {students.length === 0 ? (
                           <tr><td colSpan={7} className="ad-td-empty">No students registered</td></tr>
                         ) : (
-                          students.map((s, idx) => (
-                            <tr key={s.id}>
-                              <td className="ad-td-index">{idx + 1}</td>
-                              <td>
-                                <div className="ad-td-user">
-                                  <div className="ad-td-avatar">{(s.name ?? "S")[0].toUpperCase()}</div>
-                                  {s.name ?? "—"}
-                                </div>
-                              </td>
-                              <td>{s.email ?? "—"}</td>
-                              <td>{s.major ?? s.branch ?? "—"}</td>
-                              <td>{s.cgpa ?? "—"}</td>
-                              <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {Array.isArray(s.skills) ? s.skills.join(", ") : (s.skills ?? "—")}
-                              </td>
-                              <td>
+                          students.map((s, idx) => {
+                            const name = s.name ?? s.fullName ?? (s.firstName ? `${s.firstName} ${s.lastName ?? ""}`.trim() : null) ?? "—";
+                            return (
+                              <tr key={s.id}>
+                                <td className="ad-td-index">{idx + 1}</td>
+                                <td>
+                                  <div className="ad-td-user">
+                                    <div className="ad-td-avatar">{(name !== "—" ? name : "S")[0].toUpperCase()}</div>
+                                    {name}
+                                  </div>
+                                </td>
+                                <td>{s.email ?? s.contactEmail ?? "—"}</td>
+                                <td>{s.major ?? s.branch ?? s.department ?? "—"}</td>
+                                <td>{s.cgpa ?? s.gpa ?? "—"}</td>
+                                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {Array.isArray(s.skills) ? s.skills.join(", ") : (s.skills ?? "—")}
+                                </td>
+                                <td>
                                 {placedStudentIds.has(s.id) ? (
                                   <span className="ad-badge ad-badge-ok"><span className="ad-status-dot ad-status-active" />Placed</span>
                                 ) : studentsWhoApplied.has(s.id) ? (
@@ -838,7 +850,8 @@ export default function AdminPage() {
                                 )}
                               </td>
                             </tr>
-                          ))
+                          );
+                        })
                         )}
                       </tbody>
                     </table>
@@ -873,6 +886,13 @@ export default function AdminPage() {
                     const stu = students.find((s) => s.id === a.studentId);
                     return { ...a, student: stu };
                   });
+                  const fmtDate = (v: any) => {
+                    if (!v) return "—";
+                    if (v.toDate) return v.toDate().toLocaleDateString();
+                    if (v.seconds) return new Date(v.seconds * 1000).toLocaleDateString();
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+                  };
                   return (
                     <div className="ad-card ad-job-detail" style={{ marginBottom: '1rem' }}>
                       <div className="ad-card-head">
@@ -890,28 +910,21 @@ export default function AdminPage() {
                           <Building2Icon className="ad-detail-meta-icon" />
                           <div>
                             <span className="ad-detail-meta-label">Company</span>
-                            <span className="ad-detail-meta-value">{selectedJob.company ?? "—"}</span>
-                          </div>
-                        </div>
-                        <div className="ad-detail-meta-item">
-                          <MapPinIcon className="ad-detail-meta-icon" />
-                          <div>
-                            <span className="ad-detail-meta-label">Location</span>
-                            <span className="ad-detail-meta-value">{selectedJob.location ?? "—"}</span>
-                          </div>
-                        </div>
-                        <div className="ad-detail-meta-item">
-                          <BriefcaseIcon className="ad-detail-meta-icon" />
-                          <div>
-                            <span className="ad-detail-meta-label">Salary</span>
-                            <span className="ad-detail-meta-value">{selectedJob.salaryRange ?? selectedJob.salary ?? "—"}</span>
+                            <span className="ad-detail-meta-value">{selectedJob.company ?? selectedJob.companyName ?? "—"}</span>
                           </div>
                         </div>
                         <div className="ad-detail-meta-item">
                           <CalendarIcon className="ad-detail-meta-icon" />
                           <div>
-                            <span className="ad-detail-meta-label">Type</span>
-                            <span className="ad-detail-meta-value">{selectedJob.type ?? selectedJob.jobType ?? "Full-time"}</span>
+                            <span className="ad-detail-meta-label">Start Date</span>
+                            <span className="ad-detail-meta-value">{fmtDate(selectedJob.startDate)}</span>
+                          </div>
+                        </div>
+                        <div className="ad-detail-meta-item">
+                          <CalendarIcon className="ad-detail-meta-icon" />
+                          <div>
+                            <span className="ad-detail-meta-label">End Date</span>
+                            <span className="ad-detail-meta-value">{fmtDate(selectedJob.endDate ?? selectedJob.deadline)}</span>
                           </div>
                         </div>
                       </div>
@@ -1008,8 +1021,8 @@ export default function AdminPage() {
                           <th className="ad-th-narrow">#</th>
                           <th>Title</th>
                           <th>Company</th>
-                          <th>Salary</th>
-                          <th>Location</th>
+                          <th>Start Date</th>
+                          <th>End Date</th>
                           <th>Applications</th>
                           <th>Posted By</th>
                         </tr>
@@ -1021,6 +1034,13 @@ export default function AdminPage() {
                           jobs.map((job, idx) => {
                             const jobApps = applications.filter((a) => a.jobId === job.id);
                             const isSelected = selectedJob?.id === job.id;
+                            const fmtD = (v: any) => {
+                              if (!v) return "—";
+                              if (v.toDate) return v.toDate().toLocaleDateString();
+                              if (v.seconds) return new Date(v.seconds * 1000).toLocaleDateString();
+                              const d = new Date(v);
+                              return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+                            };
                             return (
                               <tr
                                 key={job.id}
@@ -1029,9 +1049,9 @@ export default function AdminPage() {
                               >
                                 <td className="ad-td-index">{idx + 1}</td>
                                 <td className="ad-td-bold">{job.title ?? "Untitled"}</td>
-                                <td>{job.company ?? "—"}</td>
-                                <td>{job.salaryRange ?? job.salary ?? "—"}</td>
-                                <td>{job.location ?? "—"}</td>
+                                <td>{job.company ?? job.companyName ?? "—"}</td>
+                                <td style={{ fontSize: '0.82rem' }}>{fmtD(job.startDate)}</td>
+                                <td style={{ fontSize: '0.82rem' }}>{fmtD(job.endDate ?? job.deadline)}</td>
                                 <td>
                                   <span className="ad-count-pill">{jobApps.length}</span>
                                 </td>
